@@ -12,7 +12,8 @@ import {
   FileSpreadsheet,
   Crown,
   Sun,
-  Moon
+  Moon,
+  Download,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -121,6 +122,12 @@ export function Header() {
 
         {/* Desktop Auth + Theme Toggle */}
         <div className="hidden md:flex items-center gap-2">
+          <Link to="/install">
+            <Button variant="ghost" size="sm" className="text-muted-foreground">
+              <Download className="h-4 w-4 mr-1.5" />
+              Install
+            </Button>
+          </Link>
           <ThemeToggle dark={dark} toggle={toggleTheme} />
           {user ? (
             <>
@@ -223,9 +230,26 @@ export function Header() {
               ))}
 
               <motion.div
+                initial={{ opacity: 0, x: -12 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: navLinks.length * 0.04 }}
+              >
+                <Link
+                  to="/install"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-3 px-5 py-3.5 rounded-2xl text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-secondary transition-all"
+                >
+                  <div className="p-1.5 rounded-lg bg-secondary">
+                    <Download className="h-4 w-4" />
+                  </div>
+                  Install App
+                </Link>
+              </motion.div>
+
+              <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: navLinks.length * 0.04 }}
+                transition={{ delay: (navLinks.length + 1) * 0.04 }}
                 className="border-t border-border/50 pt-3 mt-3 space-y-2"
               >
                 {user ? (

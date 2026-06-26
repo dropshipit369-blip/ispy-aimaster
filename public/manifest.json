@@ -1,56 +1,41 @@
 {
-  "name": "Ispy.ai — AI Price Intelligence",
-  "short_name": "Ispy.ai",
-  "description": "AI-powered resale price intelligence. Scan, analyze, profit.",
+  "name": "iSpy AI Master — Tactical Resale Intelligence",
+  "short_name": "iSpy AI",
+  "description": "AI-powered resale intelligence. Scan, price, profit.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#F5EED8",
-  "theme_color": "#C9920A",
-  "categories": [
-    "business",
-    "finance",
-    "shopping"
-  ],
+  "background_color": "#0f1729",
+  "theme_color": "#0f1729",
+  "categories": ["business", "finance", "shopping"],
   "icons": [
     {
-      "src": "/ispy-logo.png",
+      "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/ispy-logo.png",
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     }
   ],
-  "screenshots": [],
   "shortcuts": [
     {
       "name": "Scan Item",
       "short_name": "Scan",
       "description": "Start scanning items for pricing",
       "url": "/scan",
-      "icons": [
-        {
-          "src": "/ispy-logo.png",
-          "sizes": "192x192"
-        }
-      ]
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     },
     {
       "name": "Dashboard",
       "short_name": "Dashboard",
-      "description": "View your inventory and analytics",
+      "description": "View inventory and analytics",
       "url": "/dashboard",
-      "icons": [
-        {
-          "src": "/ispy-logo.png",
-          "sizes": "192x192"
-        }
-      ]
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ],
   "related_applications": [],
