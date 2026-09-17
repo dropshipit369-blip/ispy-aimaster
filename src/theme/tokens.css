@@ -1,0 +1,399 @@
+/*
+ * iSpy AI — Unified Design Token System
+ * ═══════════════════════════════════════
+ * Single source of truth for the entire product.
+ * Three palette variants: Standard (light-first), Pricing (dark-first), Profile (navy-first)
+ * All screens share the "Standard" palette. Pricing and Profile override via [data-screen].
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Manrope:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap');
+
+/* ── Standard Light Palette (default) ─────────────── */
+:root {
+  /* Surface hierarchy */
+  --bg: #fcf9f8;
+  --surface: #fcf9f8;
+  --surface-dim: #f3efed;
+  --surface-card: #ffffff;
+  --surface-elevated: #f3efed;
+  --surface-container: #ffffff;
+  --surface-container-low: #f5f2ef;
+  --surface-container-high: #f3efed;
+  --surface-bright: #ffffff;
+
+  /* On Surface */
+  --on-surface: #1c1b18;
+  --on-surface-variant: #6b6560;
+  --on-surface-muted: #9b958f;
+
+  /* Primary — gold family */
+  --primary: #725b24;
+  --primary-container: #c5a869;
+  --primary-deep: #8c6d23;
+  --primary-bright: #dfc78d;
+  --primary-glow: rgba(114, 91, 36, 0.1);
+  --primary-border: rgba(114, 91, 36, 0.12);
+  --primary-tint: rgba(114, 91, 36, 0.08);
+
+  /* Secondary */
+  --secondary: #15648c;
+  --secondary-container: #8dcefa;
+
+  /* Tertiary */
+  --tertiary: #006781;
+
+  /* Status */
+  --success: #2d7a3a;
+  --success-bg: #e8f5e9;
+  --warning: #ca8a04;
+  --warning-bg: rgba(202, 138, 4, 0.08);
+  --error: #dc2626;
+  --error-bg: rgba(220, 38, 38, 0.06);
+
+  /* Outline & borders */
+  --outline: #d8d2cc;
+  --outline-variant: #e8e2dc;
+  --border-subtle: rgba(0, 0, 0, 0.06);
+  --border-divider: rgba(0, 0, 0, 0.08);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 25px -3px rgba(0, 0, 0, 0.08);
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.06);
+
+  /* Spacing scale */
+  --sp-xs: 0.25rem;
+  --sp-sm: 0.5rem;
+  --sp-md: 0.875rem;
+  --sp-lg: 1.25rem;
+  --sp-xl: 2rem;
+  --gutter: 1rem;
+
+  /* Typography */
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body: 'Manrope', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-icon: 'Material Symbols Outlined';
+
+  --fs-xs: 0.6875rem;
+  --fs-sm: 0.75rem;
+  --fs-body: 0.8125rem;
+  --fs-md: 0.875rem;
+  --fs-lg: 1rem;
+  --fs-xl: 1.25rem;
+  --fs-2xl: 1.625rem;
+  --fs-3xl: 2rem;
+  --fs-display: 2.5rem;
+
+  /* Radii */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* App chrome */
+  --app-max-width: 430px;
+  --bottom-nav-height: 64px;
+  --status-bar-height: env(safe-area-inset-top, 0px);
+  --home-indicator-height: env(safe-area-inset-bottom, 0px);
+}
+
+/* ── Standard Dark Palette ────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1a1614;
+    --surface: #1a1614;
+    --surface-dim: #141110;
+    --surface-card: #221e1b;
+    --surface-elevated: #2a2520;
+    --surface-container: #221e1b;
+    --surface-container-low: #1a1614;
+    --surface-container-high: #2a2520;
+    --surface-bright: #353030;
+
+    --on-surface: #ede0d4;
+    --on-surface-variant: #b8ada5;
+    --on-surface-muted: #7a726c;
+
+    --primary: #dfc78d;
+    --primary-container: #8c6d23;
+    --primary-deep: #c5a869;
+    --primary-bright: #f0e2bb;
+    --primary-glow: rgba(197, 168, 105, 0.2);
+    --primary-border: rgba(197, 168, 105, 0.15);
+    --primary-tint: rgba(197, 168, 105, 0.12);
+
+    --secondary: #7fc4e8;
+    --secondary-container: #035d84;
+
+    --tertiary: #72d2e8;
+
+    --success: #66bb6a;
+    --success-bg: #1b3a1d;
+    --warning: #fbbf24;
+    --warning-bg: rgba(251, 191, 36, 0.12);
+    --error: #f87171;
+    --error-bg: rgba(248, 113, 113, 0.12);
+
+    --outline: #4a423c;
+    --outline-variant: #3a332e;
+    --border-subtle: rgba(255, 255, 255, 0.06);
+    --border-divider: rgba(255, 255, 255, 0.08);
+
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.15);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -2px rgba(0, 0, 0, 0.15);
+    --shadow-lg: 0 10px 25px -3px rgba(0, 0, 0, 0.25);
+    --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.3);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #1a1614;
+  --surface: #1a1614;
+  --surface-dim: #141110;
+  --surface-card: #221e1b;
+  --surface-elevated: #2a2520;
+  --surface-container: #221e1b;
+  --surface-container-low: #1a1614;
+  --surface-container-high: #2a2520;
+  --surface-bright: #353030;
+
+  --on-surface: #ede0d4;
+  --on-surface-variant: #b8ada5;
+  --on-surface-muted: #7a726c;
+
+  --primary: #dfc78d;
+  --primary-container: #8c6d23;
+  --primary-deep: #c5a869;
+  --primary-bright: #f0e2bb;
+  --primary-glow: rgba(197, 168, 105, 0.2);
+  --primary-border: rgba(197, 168, 105, 0.15);
+  --primary-tint: rgba(197, 168, 105, 0.12);
+
+  --secondary: #7fc4e8;
+  --secondary-container: #035d84;
+
+  --tertiary: #72d2e8;
+
+  --success: #66bb6a;
+  --success-bg: #1b3a1d;
+  --warning: #fbbf24;
+  --warning-bg: rgba(251, 191, 36, 0.12);
+  --error: #f87171;
+  --error-bg: rgba(248, 113, 113, 0.12);
+
+  --outline: #4a423c;
+  --outline-variant: #3a332e;
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-divider: rgba(255, 255, 255, 0.08);
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.15);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -2px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 10px 25px -3px rgba(0, 0, 0, 0.25);
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Pricing Screen Override (dark-first, #131313) ── */
+[data-screen="pricing"] {
+  --bg: #131313;
+  --surface: #131313;
+  --surface-dim: #131313;
+  --surface-card: #202020;
+  --surface-elevated: #2a2a2a;
+  --surface-container: #202020;
+  --surface-container-low: #1b1c1c;
+  --surface-container-high: #2a2a2a;
+  --surface-bright: #393939;
+
+  --on-surface: #e5e2e1;
+  --on-surface-variant: #d0c5b5;
+  --on-surface-muted: #989081;
+
+  --primary: #e2c382;
+  --primary-container: #c5a869;
+}
+
+@media (prefers-color-scheme: light) {
+  [data-screen="pricing"]:not([data-theme="dark"]) {
+    --bg: #fcf9f8;
+    --surface: #fcf9f8;
+    --surface-dim: #f3efed;
+    --surface-card: #ffffff;
+    --surface-elevated: #f3efed;
+    --on-surface: #1c1b18;
+    --on-surface-variant: #6b6560;
+    --primary: #725b24;
+    --primary-container: #c5a869;
+  }
+}
+
+/* ── Profile Screen Override (navy-first, #070d18) ── */
+[data-screen="profile"] {
+  --bg: #070d18;
+  --surface: #0a1120;
+  --surface-dim: #070d18;
+  --surface-card: #101a2e;
+  --surface-elevated: #1c263c;
+  --surface-container: #101a2e;
+  --surface-container-low: #0b1322;
+  --surface-container-high: #1c263c;
+  --surface-bright: #1e293b;
+
+  --on-surface: #f5f0eb;
+  --on-surface-variant: #94a3b8;
+  --on-surface-muted: #64748b;
+
+  --primary: #dfc78d;
+  --primary-container: #c5a869;
+  --primary-deep: #856a31;
+  --primary-glow: rgba(197, 168, 105, 0.2);
+  --primary-border: rgba(197, 168, 105, 0.15);
+  --primary-tint: rgba(197, 168, 105, 0.18);
+
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-divider: rgba(255, 255, 255, 0.1);
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+@media (prefers-color-scheme: light) {
+  [data-screen="profile"]:not([data-theme="dark"]) {
+    --bg: #fcf9f8;
+    --surface: #f8f6f3;
+    --surface-dim: #f0ece8;
+    --surface-card: #ffffff;
+    --surface-elevated: #f3efed;
+    --surface-container: #ffffff;
+    --on-surface: #1c1b18;
+    --on-surface-variant: #6b6560;
+    --on-surface-muted: #9b958f;
+    --primary: #725b24;
+    --primary-container: #c5a869;
+    --primary-glow: rgba(114, 91, 36, 0.1);
+    --primary-border: rgba(114, 91, 36, 0.12);
+    --primary-tint: rgba(114, 91, 36, 0.08);
+    --border-subtle: rgba(0, 0, 0, 0.06);
+    --border-divider: rgba(0, 0, 0, 0.08);
+    --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.06);
+  }
+}
+
+/* ── Dark Scan Override (espresso luxury, #0d0a08) ── */
+[data-screen="dark-scan"] {
+  --bg: #0d0a08;
+  --surface: #0d0a08;
+  --surface-dim: #080604;
+  --surface-card: #1a1510;
+  --surface-elevated: #252018;
+
+  --on-surface: #ede0d4;
+  --on-surface-variant: #b8a998;
+
+  --primary: #d4af37;
+  --primary-container: #f3e5ab;
+  --primary-deep: #8b7320;
+  --primary-bright: #f3e5ab;
+}
+
+@media (prefers-color-scheme: light) {
+  [data-screen="dark-scan"]:not([data-theme="dark"]) {
+    --bg: #fcf9f8;
+    --surface: #fcf9f8;
+    --surface-card: #ffffff;
+    --on-surface: #1c1b18;
+    --primary: #725b24;
+    --primary-container: #c5a869;
+  }
+}
+
+/* ── Global Reset ─────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-padding-top: env(safe-area-inset-top, 0px);
+}
+
+body {
+  background: var(--bg);
+  color: var(--on-surface);
+  font-family: var(--font-body);
+  font-size: var(--fs-md);
+  line-height: 1.6;
+  min-height: 100vh;
+  overflow-x: hidden;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+::selection {
+  background: var(--primary);
+  color: var(--bg);
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Typography Utilities ─────────────────────────── */
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-body {
+  font-family: var(--font-body);
+}
+
+.icon {
+  font-family: var(--font-icon);
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Animations ───────────────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+@keyframes scan-line {
+  0% { top: 10%; }
+  50% { top: 85%; }
+  100% { top: 10%; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
