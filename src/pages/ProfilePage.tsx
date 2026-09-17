@@ -7,6 +7,7 @@ import { getScanHistory } from '@/services/scans'
 
 interface Profile {
   display_name: string | null
+  full_name: string | null
   plan: string
   scans_today: number
   scans_limit: number
@@ -26,7 +27,7 @@ export function ProfilePage() {
     supabase
       .from('profiles')
       .select('*')
-      .eq('id', user.id)
+      .eq('user_id', user.id)
       .single()
       .then(({ data }) => {
         if (data) setProfile(data as Profile)
@@ -36,7 +37,7 @@ export function ProfilePage() {
     getScanHistory(user.id, 1000).then((scans) => setTotalScans(scans.length))
   }, [user])
 
-  const displayName = profile?.display_name ?? user?.email?.split('@')[0] ?? 'User'
+  const displayName = profile?.display_name ?? profile?.full_name ?? user?.email?.split('@')[0] ?? 'User'
   const initial = displayName.charAt(0).toUpperCase()
   const memberSince = profile?.created_at
     ? new Date(profile.created_at).toLocaleDateString('en-AU', { month: 'short', year: 'numeric' })

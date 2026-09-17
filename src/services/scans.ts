@@ -43,7 +43,7 @@ export async function getRemainingScans(userId: string) {
   const { data, error } = await supabase
     .from('profiles')
     .select('scans_today, scans_limit')
-    .eq('id', userId)
+    .eq('user_id', userId)
     .single()
 
   if (error || !data) return { used: 0, limit: 3, remaining: 3 }
