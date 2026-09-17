@@ -1,7 +1,22 @@
 import { supabase } from '@/lib/supabase'
-import type { EbaySearchResponse, ScanResponse, ScanResult } from '@/types/ebay'
+import type { ScanResponse, ScanResult } from '@/types/ebay'
 
-const EDGE_FN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ebay-search`
+const EDGE_FN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ebay-proxy`
+
+/** Response shape from the ebay-proxy edge function */
+interface ProxySearchResult {
+  total: number
+  items: {
+    itemId: string
+    title: string
+    price: number
+    currency: string
+    condition: string
+    imageUrl: string | null
+    url: string | null
+    marketplace: string
+  }[]
+}
 
 /**
  * Search eBay via our Supabase Edge Function proxy.
@@ -14,40 +29,43 @@ export async function searchEbay(
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) throw new Error('Not authenticated')
 
-  const params = new URLSearchParams({ q: query })
-  if (options.limit) params.set('limit', String(options.limit))
-  if (options.sort) params.set('sort', options.sort)
-  if (options.filter) params.set('filter', options.filter)
+  const body: Record<string, unknown> = {
+    action: 'search',
+    q: query,
+  }
+  if (options.limit) body.limit = options.limit
 
-  const res = await fetch(`${EDGE_FN_URL}?${params}`, {
+  const res = await fetch(EDGE_FN_URL, {
+    method: 'POST',
     headers: {
       Authorization: `Bearer ${session.access_token}`,
       'Content-Type': 'application/json',
     },
+    body: JSON.stringify(body),
   })
 
   if (!res.ok) {
-    const body = await res.text()
-    throw new Error(`eBay search failed (${res.status}): ${body}`)
+    const err = await res.json().catch(() => ({ error: `Request failed (${res.status})` }))
+    throw new Error(err.error ?? `eBay search failed (${res.status})`)
   }
 
-  const data: EbaySearchResponse = await res.json()
+  const data: ProxySearchResult = await res.json()
   return transformResponse(query, data)
 }
 
-/** Transform raw eBay API response into our app's format */
-function transformResponse(query: string, data: EbaySearchResponse): ScanResponse {
-  const items: ScanResult[] = (data.itemSummaries ?? []).map((item) => ({
+/** Transform proxy response into our app's format */
+function transformResponse(query: string, data: ProxySearchResult): ScanResponse {
+  const items: ScanResult[] = (data.items ?? []).map((item) => ({
     id: item.itemId,
     name: item.title,
     confidence: calculateConfidence(item.title, query),
-    estimatedValue: `$${parseFloat(item.price.value).toFixed(2)}`,
-    currency: item.price.currency,
+    estimatedValue: `$${item.price.toFixed(2)}`,
+    currency: item.currency,
     condition: item.condition ?? 'Unknown',
-    imageUrl: item.image?.imageUrl ?? '',
-    itemUrl: item.itemWebUrl,
-    seller: item.seller?.username ?? 'Unknown',
-    sellerRating: item.seller?.feedbackPercentage ?? 'N/A',
+    imageUrl: item.imageUrl ?? '',
+    itemUrl: item.url ?? '',
+    seller: 'eBay AU',
+    sellerRating: 'N/A',
   }))
 
   const prices = items.map((i) => parseFloat(i.estimatedValue.replace('$', '')))
