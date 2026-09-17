@@ -1,36 +1,80 @@
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Icon, Badge, GoldDivider, Card, Button, StatTile } from '@/components'
+import { useAuth } from '@/hooks/useAuth'
+import { supabase } from '@/lib/supabase'
+import { getScanHistory } from '@/services/scans'
 
-const PROFILE_SECTIONS = [
-  {
-    title: 'Account',
-    items: [
-      { icon: 'person', label: 'Personal Details', value: 'Joel M.' },
-      { icon: 'email', label: 'Email', value: 'joel@ispy.ai' },
-      { icon: 'diamond', label: 'Plan', value: 'Pro', badge: 'gold' as const },
-      { icon: 'calendar_today', label: 'Member Since', value: 'Mar 2026' },
-    ],
-  },
-  {
-    title: 'Scanning',
-    items: [
-      { icon: 'center_focus_strong', label: 'Scans Today', value: '12 / 50' },
-      { icon: 'history', label: 'Total Scans', value: '847' },
-      { icon: 'bookmark', label: 'Saved Items', value: '64' },
-      { icon: 'trending_up', label: 'Avg. Margin Found', value: '+43%' },
-    ],
-  },
-  {
-    title: 'Preferences',
-    items: [
-      { icon: 'notifications', label: 'Notifications', value: 'On' },
-      { icon: 'dark_mode', label: 'Appearance', value: 'Auto' },
-      { icon: 'language', label: 'Currency', value: 'AUD $' },
-      { icon: 'security', label: 'Privacy', value: 'Standard' },
-    ],
-  },
-]
+interface Profile {
+  display_name: string | null
+  plan: string
+  scans_today: number
+  scans_limit: number
+  created_at: string
+}
 
 export function ProfilePage() {
+  const { user, signOut } = useAuth()
+  const navigate = useNavigate()
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [totalScans, setTotalScans] = useState(0)
+
+  useEffect(() => {
+    if (!user) return
+
+    // Fetch profile
+    supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+      .then(({ data }) => {
+        if (data) setProfile(data as Profile)
+      })
+
+    // Get total scan count
+    getScanHistory(user.id, 1000).then((scans) => setTotalScans(scans.length))
+  }, [user])
+
+  const displayName = profile?.display_name ?? user?.email?.split('@')[0] ?? 'User'
+  const initial = displayName.charAt(0).toUpperCase()
+  const memberSince = profile?.created_at
+    ? new Date(profile.created_at).toLocaleDateString('en-AU', { month: 'short', year: 'numeric' })
+    : '—'
+
+  const handleSignOut = async () => {
+    await signOut()
+    navigate('/')
+  }
+
+  const PROFILE_SECTIONS = [
+    {
+      title: 'Account',
+      items: [
+        { icon: 'person', label: 'Display Name', value: displayName },
+        { icon: 'email', label: 'Email', value: user?.email ?? '—' },
+        { icon: 'diamond', label: 'Plan', value: profile?.plan ?? 'free', badge: (profile?.plan === 'pro' || profile?.plan === 'elite') ? 'gold' as const : undefined },
+        { icon: 'calendar_today', label: 'Member Since', value: memberSince },
+      ],
+    },
+    {
+      title: 'Scanning',
+      items: [
+        { icon: 'center_focus_strong', label: 'Scans Today', value: `${profile?.scans_today ?? 0} / ${profile?.scans_limit ?? 3}` },
+        { icon: 'history', label: 'Total Scans', value: String(totalScans) },
+      ],
+    },
+    {
+      title: 'Preferences',
+      items: [
+        { icon: 'notifications', label: 'Notifications', value: 'On' },
+        { icon: 'dark_mode', label: 'Appearance', value: 'Auto' },
+        { icon: 'language', label: 'Currency', value: 'AUD $' },
+        { icon: 'security', label: 'Privacy', value: 'Standard' },
+      ],
+    },
+  ]
+
   return (
     <div
       className="flex min-h-screen flex-col"
@@ -41,11 +85,10 @@ export function ProfilePage() {
       <div
         className="relative px-4 pb-6 pt-4 text-center"
         style={{
-          paddingTop: 'calc(var(--status-bar-height) + 16px)',
+          paddingTop: 'calc(var(--status-bar-height, 0px) + 16px)',
           background: 'linear-gradient(180deg, var(--surface-container-high) 0%, var(--bg) 100%)',
         }}
       >
-        {/* Avatar */}
         <div
           className="relative mx-auto mb-3 flex h-20 w-20 items-center justify-center rounded-full"
           style={{
@@ -57,15 +100,11 @@ export function ProfilePage() {
             className="text-3xl font-bold"
             style={{ color: 'var(--bg)', fontFamily: 'var(--font-display)' }}
           >
-            J
+            {initial}
           </span>
-          {/* Online indicator */}
           <div
             className="absolute bottom-0 right-0 h-5 w-5 rounded-full border-2"
-            style={{
-              background: 'var(--success)',
-              borderColor: 'var(--bg)',
-            }}
+            style={{ background: 'var(--success)', borderColor: 'var(--bg)' }}
           />
         </div>
 
@@ -73,25 +112,24 @@ export function ProfilePage() {
           className="text-xl font-bold"
           style={{ fontFamily: 'var(--font-display)', color: 'var(--on-surface)' }}
         >
-          Joel M.
+          {displayName}
         </h1>
         <p className="text-sm" style={{ color: 'var(--on-surface-variant)' }}>
           Resale Intelligence Operator
         </p>
 
-        {/* Superuser badge */}
         <div className="mt-2 flex justify-center">
           <Badge variant="gold">
-            <Icon name="workspace_premium" size={12} /> Superuser
+            <Icon name="workspace_premium" size={12} /> {(profile?.plan ?? 'free').toUpperCase()}
           </Badge>
         </div>
       </div>
 
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-2 px-4 pb-4">
-        <StatTile label="Scans" value="847" trend={{ direction: 'up', value: '+12%' }} />
-        <StatTile label="Saved" value="64" />
-        <StatTile label="Margin" value="43%" trend={{ direction: 'up', value: 'avg' }} />
+        <StatTile label="Scans" value={totalScans} trend={{ direction: 'up', value: 'total' }} />
+        <StatTile label="Today" value={profile?.scans_today ?? 0} />
+        <StatTile label="Limit" value={profile?.scans_limit ?? 3} />
       </div>
 
       <GoldDivider variant="gradient" className="mx-4" />
@@ -146,7 +184,7 @@ export function ProfilePage() {
 
       {/* Sign out */}
       <div className="px-4 pb-6">
-        <Button variant="ghost" fullWidth style={{ color: 'var(--error)' }}>
+        <Button variant="ghost" fullWidth style={{ color: 'var(--error)' }} onClick={handleSignOut}>
           <Icon name="logout" size={18} />
           Sign Out
         </Button>

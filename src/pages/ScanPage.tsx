@@ -1,29 +1,58 @@
-import { useState } from 'react'
-import { ScanViewfinder, ScanResultPanel, FibonacciSpiral, Badge, Icon, Button } from '@/components'
-
-const MOCK_RESULT = {
-  primaryItem: {
-    name: 'Louis Vuitton Speedy 30',
-    confidence: 97,
-    estimatedValue: '$1,450',
-    margin: '+62%',
-  },
-  secondaryItems: [
-    { name: 'Hermès Twilly Scarf', confidence: 89, estimatedValue: '$280' },
-    { name: 'Chanel No.5 Vintage', confidence: 82, estimatedValue: '$195' },
-  ],
-  totalValue: '$1,925',
-}
+import { useState, useCallback } from 'react'
+import { ScanViewfinder, ScanResultPanel, FibonacciSpiral, Badge, Icon, Button, StatTile, Card } from '@/components'
+import { useAuth } from '@/hooks/useAuth'
+import { searchEbay } from '@/services/ebay'
+import { saveScan, getRemainingScans, incrementScanCount } from '@/services/scans'
+import type { ScanResponse, ScanResult } from '@/types/ebay'
 
 export function ScanPage() {
-  const [hasResult, setHasResult] = useState(true)
+  const { user } = useAuth()
+  const [query, setQuery] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<ScanResponse | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [scansRemaining, setScansRemaining] = useState<number | null>(null)
+
+  const handleScan = useCallback(async () => {
+    if (!query.trim() || !user) return
+    setLoading(true)
+    setError(null)
+    setResult(null)
+
+    try {
+      // Check remaining scans
+      const { remaining } = await getRemainingScans(user.id)
+      if (remaining <= 0) {
+        setError('Daily scan limit reached. Upgrade to Pro for unlimited scans.')
+        setLoading(false)
+        return
+      }
+
+      const data = await searchEbay(query.trim(), { limit: 12 })
+      setResult(data)
+      setScansRemaining(remaining - 1)
+
+      // Persist scan + increment counter
+      await Promise.all([
+        saveScan(user.id, data),
+        incrementScanCount(user.id),
+      ])
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }, [query, user])
+
+  const primaryItem = result?.items[0]
+  const secondaryItems = result?.items.slice(1, 4) ?? []
 
   return (
     <div className="flex min-h-screen flex-col" style={{ background: 'var(--bg)' }}>
       {/* Status bar */}
       <header
         className="flex items-center justify-between px-4 py-3"
-        style={{ paddingTop: 'calc(var(--status-bar-height) + 12px)' }}
+        style={{ paddingTop: 'calc(var(--status-bar-height, 0px) + 12px)' }}
       >
         <div className="flex items-center gap-2">
           <span
@@ -47,7 +76,7 @@ export function ScanPage() {
             }}
           >
             <Icon name="flash_on" size={14} />
-            <span>3 / 3</span>
+            <span>{scansRemaining ?? '—'} left</span>
           </button>
           <Icon name="history" size={22} style={{ color: 'var(--on-surface-variant)' }} />
         </div>
@@ -58,36 +87,41 @@ export function ScanPage() {
         <Badge variant="success">
           <Icon name="fiber_manual_record" size={8} /> LIVE
         </Badge>
-        <Badge variant="subtle">TensorFlow 2.x</Badge>
+        <Badge variant="subtle">eBay AU</Badge>
         <Badge variant="subtle">
-          <Icon name="speed" size={12} /> 0.3s
+          <Icon name="speed" size={12} /> Real-time
         </Badge>
       </div>
 
       {/* Viewfinder */}
       <div className="relative px-4">
-        <ScanViewfinder showLaser={!hasResult}>
-          {/* Fibonacci spiral overlay */}
+        <ScanViewfinder showLaser={loading}>
           <FibonacciSpiral
             size={280}
             className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-30"
           />
 
-          {/* Camera placeholder */}
+          {/* Search input overlay */}
           <div
-            className="flex h-full items-center justify-center"
+            className="flex h-full flex-col items-center justify-center gap-3 px-6"
             style={{ minHeight: 240, background: 'var(--surface-dim)' }}
           >
-            <div className="text-center">
-              <Icon name="center_focus_strong" size={48} style={{ color: 'var(--primary-container)', opacity: 0.5 }} />
-              <p className="mt-2 text-sm" style={{ color: 'var(--on-surface-muted)' }}>
-                Point camera at item to scan
-              </p>
-            </div>
+            <Icon
+              name={loading ? 'radar' : 'center_focus_strong'}
+              size={48}
+              style={{
+                color: 'var(--primary-container)',
+                opacity: loading ? 1 : 0.5,
+                animation: loading ? 'pulse-glow 1.5s ease-in-out infinite' : 'none',
+              }}
+            />
+            <p className="text-sm text-center" style={{ color: 'var(--on-surface-muted)' }}>
+              {loading ? 'Scanning eBay marketplace...' : 'Enter item name to scan market value'}
+            </p>
           </div>
 
           {/* Detection pins (when result active) */}
-          {hasResult && (
+          {result && (
             <>
               <div
                 className="absolute rounded-full"
@@ -112,29 +146,120 @@ export function ScanPage() {
         </ScanViewfinder>
       </div>
 
-      {/* Scan button */}
-      {!hasResult && (
-        <div className="flex justify-center py-4">
-          <Button
-            variant="gold"
-            size="lg"
-            icon={<Icon name="center_focus_strong" size={20} />}
-            onClick={() => setHasResult(true)}
-          >
-            Scan Item
-          </Button>
+      {/* Search bar */}
+      <div className="flex gap-2 px-4 pt-4">
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleScan()}
+          placeholder="e.g. Louis Vuitton Speedy 30, Nike Dunk Low..."
+          disabled={loading}
+          className="min-w-0 flex-1 rounded-[var(--radius-lg)] border px-4 py-3 text-sm outline-none"
+          style={{
+            background: 'var(--surface-card)',
+            border: '1px solid var(--border-subtle)',
+            color: 'var(--on-surface)',
+            fontFamily: 'var(--font-body)',
+          }}
+        />
+        <Button
+          variant="gold"
+          icon={<Icon name={loading ? 'hourglass_top' : 'search'} size={20} />}
+          onClick={handleScan}
+          disabled={loading || !query.trim()}
+        >
+          {loading ? '' : 'Scan'}
+        </Button>
+      </div>
+
+      {/* Error */}
+      {error && (
+        <div className="mx-4 mt-3 rounded-[var(--radius-lg)] px-4 py-3" style={{ background: 'var(--error-container, #fde8e8)' }}>
+          <p className="text-sm" style={{ color: 'var(--error)' }}>{error}</p>
+        </div>
+      )}
+
+      {/* Market stats */}
+      {result && (
+        <div className="grid grid-cols-3 gap-2 px-4 pt-4" style={{ animation: 'fadeInUp 0.3s ease-out' }}>
+          <StatTile
+            label="Avg Price"
+            value={`$${result.averagePrice}`}
+            icon={<Icon name="analytics" size={14} style={{ color: 'var(--primary)' }} />}
+          />
+          <StatTile
+            label="Median"
+            value={`$${result.medianPrice}`}
+            icon={<Icon name="trending_up" size={14} style={{ color: 'var(--success)' }} />}
+          />
+          <StatTile
+            label="Listings"
+            value={result.totalResults > 999 ? `${(result.totalResults / 1000).toFixed(1)}k` : result.totalResults}
+            icon={<Icon name="storefront" size={14} style={{ color: 'var(--on-surface-variant)' }} />}
+          />
         </div>
       )}
 
       {/* Results */}
-      {hasResult && (
-        <div className="flex-1 px-4 pt-4" style={{ animation: 'fadeInUp 0.4s ease-out' }}>
+      {result && primaryItem && (
+        <div className="flex-1 px-4 pt-4 pb-4" style={{ animation: 'fadeInUp 0.4s ease-out' }}>
           <ScanResultPanel
-            primaryItem={MOCK_RESULT.primaryItem}
-            secondaryItems={MOCK_RESULT.secondaryItems}
-            totalValue={MOCK_RESULT.totalValue}
+            primaryItem={{
+              name: primaryItem.name,
+              confidence: primaryItem.confidence,
+              estimatedValue: primaryItem.estimatedValue,
+              margin: primaryItem.margin,
+            }}
+            secondaryItems={secondaryItems.map((i) => ({
+              name: i.name,
+              confidence: i.confidence,
+              estimatedValue: i.estimatedValue,
+            }))}
+            totalValue={result.priceRange.high}
             variant="light"
           />
+
+          {/* Full results list */}
+          {result.items.length > 4 && (
+            <Card variant="frosted" className="mt-3">
+              <h4
+                className="mb-2 text-xs font-semibold uppercase tracking-wider"
+                style={{ color: 'var(--primary)', fontFamily: 'var(--font-body)' }}
+              >
+                All Results ({result.items.length})
+              </h4>
+              <div className="flex flex-col gap-2">
+                {result.items.slice(4).map((item: ScanResult) => (
+                  <a
+                    key={item.id}
+                    href={item.itemUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between rounded-[var(--radius-md)] px-3 py-2 no-underline"
+                    style={{
+                      background: 'var(--surface-dim)',
+                      color: 'var(--on-surface)',
+                      transition: 'background 0.15s',
+                    }}
+                  >
+                    <div className="flex min-w-0 flex-col">
+                      <span className="truncate text-sm">{item.name}</span>
+                      <span className="text-xs" style={{ color: 'var(--on-surface-muted)' }}>
+                        {item.condition} · {item.seller}
+                      </span>
+                    </div>
+                    <span
+                      className="ml-2 shrink-0 text-sm font-semibold tabular-nums"
+                      style={{ color: 'var(--primary)' }}
+                    >
+                      {item.estimatedValue}
+                    </span>
+                  </a>
+                ))}
+              </div>
+            </Card>
+          )}
         </div>
       )}
     </div>
