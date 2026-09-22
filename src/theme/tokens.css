@@ -1,3 +1,6 @@
+/* Pin Tailwind v4's layer order before any layered rule below declares a layer. */
+@layer theme, base, components, utilities;
+
 /*
  * iSpy AI — Unified Design Token System
  * ═══════════════════════════════════════
@@ -308,10 +311,14 @@
 }
 
 /* ── Global Reset ─────────────────────────────────── */
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+/* Must live in the base layer: an unlayered reset outranks every Tailwind utility
+   (cascade layers beat specificity), which silently disabled every padding and margin utility. */
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
 }
 
 html {
