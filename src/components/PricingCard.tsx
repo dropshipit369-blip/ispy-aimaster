@@ -16,6 +16,7 @@ interface PricingCardProps {
   features: PricingFeature[]
   isPopular?: boolean
   ctaLabel?: string
+  ctaDisabled?: boolean
   onSelect?: () => void
 }
 
@@ -28,6 +29,7 @@ export function PricingCard({
   features,
   isPopular = false,
   ctaLabel = 'Get Started',
+  ctaDisabled = false,
   onSelect,
 }: PricingCardProps) {
   return (
@@ -97,6 +99,7 @@ export function PricingCard({
         <Button
           variant={isPopular ? 'gold' : 'outline'}
           fullWidth
+          disabled={ctaDisabled}
           onClick={onSelect}
         >
           {ctaLabel}

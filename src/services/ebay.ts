@@ -1,9 +1,9 @@
-import { supabase } from '@/lib/supabase'
-import type { ScanResponse, ScanResult } from '@/types/ebay'
+import { formatMoney } from '@/lib/format'
+import { callFunction } from '@/services/functions'
+import { allowanceFromDetails } from '@/services/usage'
+import type { ConditionFilter, ScanResponse, ScanResult } from '@/types/ebay'
 
-const EDGE_FN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ebay-proxy`
-
-/** Response shape from the ebay-proxy edge function */
+/** Response shape from the ebay-proxy edge function (`action: "search"`). */
 interface ProxySearchResult {
   total: number
   items: {
@@ -16,96 +16,96 @@ interface ProxySearchResult {
     url: string | null
     marketplace: string
   }[]
+  quota?: Record<string, unknown>
 }
 
 /**
- * Search eBay via our Supabase Edge Function proxy.
- * The edge function handles OAuth client-credentials and keeps keys server-side.
+ * Searches current eBay AU listings through the ebay-proxy edge function.
+ * The function authenticates the user, consumes one scan from today's allowance and
+ * keeps eBay credentials server-side. A spent allowance surfaces as ApiError code "scan_limit_reached".
  */
 export async function searchEbay(
   query: string,
-  options: { limit?: number; sort?: string; filter?: string } = {},
+  options: { limit?: number; condition?: ConditionFilter } = {},
 ): Promise<ScanResponse> {
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) throw new Error('Not authenticated')
-
-  const body: Record<string, unknown> = {
+  const condition = options.condition ?? 'any'
+  const data = await callFunction<ProxySearchResult>('ebay-proxy', {
     action: 'search',
     q: query,
-  }
-  if (options.limit) body.limit = options.limit
-
-  const res = await fetch(EDGE_FN_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
+    limit: options.limit ?? 12,
+    ...(condition === 'any' ? {} : { condition }),
   })
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: `Request failed (${res.status})` }))
-    throw new Error(err.error ?? `eBay search failed (${res.status})`)
-  }
-
-  const data: ProxySearchResult = await res.json()
-  return transformResponse(query, data)
+  return transformResponse(query, condition, data)
 }
 
-/** Transform proxy response into our app's format */
-function transformResponse(query: string, data: ProxySearchResult): ScanResponse {
-  const items: ScanResult[] = (data.items ?? []).map((item) => ({
-    id: item.itemId,
-    name: item.title,
-    confidence: calculateConfidence(item.title, query),
-    estimatedValue: `$${item.price.toFixed(2)}`,
-    currency: item.currency,
-    condition: item.condition ?? 'Unknown',
-    imageUrl: item.imageUrl ?? '',
-    itemUrl: item.url ?? '',
-    seller: 'eBay AU',
-    sellerRating: 'N/A',
-  }))
+let environmentPromise: Promise<'production' | 'sandbox' | 'unknown'> | null = null
 
-  const prices = items.map((i) => parseFloat(i.estimatedValue.replace('$', '')))
-  const sorted = [...prices].sort((a, b) => a - b)
-  const avg = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : 0
-  const median = sorted.length
-    ? sorted.length % 2 === 0
-      ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
-      : sorted[Math.floor(sorted.length / 2)]
-    : 0
+/** Whether market data is live (production) or eBay test data (sandbox). Cached for the session. */
+export function getMarketEnvironment(): Promise<'production' | 'sandbox' | 'unknown'> {
+  environmentPromise ??= callFunction<{ environment?: string }>('ebay-proxy', { action: 'health' })
+    .then((r) => (r.environment === 'production' || r.environment === 'sandbox' ? r.environment : 'unknown'))
+    .catch(() => {
+      environmentPromise = null
+      return 'unknown' as const
+    })
+  return environmentPromise
+}
 
-  // Compute margin vs median for each item
-  const itemsWithMargin = items.map((item) => {
-    const price = parseFloat(item.estimatedValue.replace('$', ''))
-    if (median > 0 && price < median) {
-      const marginPct = Math.round(((median - price) / price) * 100)
-      return { ...item, margin: `+${marginPct}%` }
-    }
-    return item
-  })
+function transformResponse(query: string, condition: ConditionFilter, data: ProxySearchResult): ScanResponse {
+  const items: ScanResult[] = (data.items ?? [])
+    .filter((item) => Number.isFinite(item.price) && item.price > 0)
+    .map((item) => ({
+      id: item.itemId,
+      name: item.title,
+      matchScore: matchScore(item.title, query),
+      price: item.price,
+      currency: item.currency || 'AUD',
+      priceLabel: formatMoney(item.price, item.currency || 'AUD'),
+      condition: item.condition || 'Not specified',
+      imageUrl: item.imageUrl ?? '',
+      itemUrl: safeEbayUrl(item.url),
+      marketplace: item.marketplace || 'eBay',
+    }))
+
+  const prices = items.map((i) => i.price).sort((a, b) => a - b)
+  const mid = Math.floor(prices.length / 2)
+  const median = prices.length ? (prices.length % 2 ? prices[mid] : (prices[mid - 1] + prices[mid]) / 2) : 0
+  const average = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : 0
+  const round = (n: number) => Math.round(n * 100) / 100
 
   return {
     query,
-    totalResults: data.total ?? 0,
-    items: itemsWithMargin,
-    averagePrice: Math.round(avg * 100) / 100,
-    medianPrice: Math.round(median * 100) / 100,
-    priceRange: {
-      low: sorted.length ? `$${sorted[0].toFixed(2)}` : '$0.00',
-      high: sorted.length ? `$${sorted[sorted.length - 1].toFixed(2)}` : '$0.00',
-    },
+    condition,
+    totalResults: data.total ?? items.length,
+    items,
+    currency: items[0]?.currency ?? 'AUD',
+    averagePrice: round(average),
+    medianPrice: round(median),
+    lowPrice: prices[0] ?? 0,
+    highPrice: prices.at(-1) ?? 0,
     timestamp: new Date().toISOString(),
+    allowance: data.quota ? allowanceFromDetails(data.quota) : null,
   }
 }
 
-/** Simple keyword-overlap confidence scorer */
-function calculateConfidence(title: string, query: string): number {
-  const titleWords = title.toLowerCase().split(/\s+/)
-  const queryWords = query.toLowerCase().split(/\s+/)
-  const matches = queryWords.filter((w) => titleWords.some((t) => t.includes(w)))
-  const base = Math.round((matches.length / queryWords.length) * 100)
-  return Math.min(99, Math.max(50, base))
+/** Only ever link out to eBay over https. */
+function safeEbayUrl(value: string | null): string {
+  if (!value) return ''
+  try {
+    const url = new URL(value)
+    const host = url.hostname
+    const isEbay = host === 'ebay.com' || host.endsWith('.ebay.com') || host === 'ebay.com.au' || host.endsWith('.ebay.com.au')
+    return url.protocol === 'https:' && isEbay ? url.href : ''
+  } catch {
+    return ''
+  }
+}
+
+/** Share of the searched words found in the listing title (0–100). */
+function matchScore(title: string, query: string): number {
+  const titleText = title.toLowerCase()
+  const words = query.toLowerCase().split(/\s+/).filter((w) => w.length > 1)
+  if (!words.length) return 0
+  const hits = words.filter((w) => titleText.includes(w)).length
+  return Math.round((hits / words.length) * 100)
 }

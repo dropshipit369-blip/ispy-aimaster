@@ -3,25 +3,38 @@ import { Badge } from './Badge'
 import { GoldDivider } from './GoldDivider'
 import { Icon } from './Icon'
 
-interface ScanItem {
+interface ListingRow {
+  id: string
   name: string
-  confidence: number
-  estimatedValue: string
-  margin?: string
+  price: string
+  condition?: string
+  href?: string
+  matchScore?: number
 }
 
 interface ScanResultPanelProps {
-  primaryItem: ScanItem
-  secondaryItems?: ScanItem[]
-  totalValue?: string
+  title: string
+  subtitle?: string
+  badge?: string
+  valueLabel: string
+  value: string
+  range?: { low: string; high: string }
+  listingsTitle?: string
+  listings?: ListingRow[]
   variant?: 'light' | 'dark'
   className?: string
 }
 
+/** Price summary for a scan plus the matching listings, each linking out to eBay. */
 export function ScanResultPanel({
-  primaryItem,
-  secondaryItems = [],
-  totalValue,
+  title,
+  subtitle,
+  badge,
+  valueLabel,
+  value,
+  range,
+  listingsTitle = 'Matching listings',
+  listings = [],
   variant = 'light',
   className = '',
 }: ScanResultPanelProps) {
@@ -29,93 +42,95 @@ export function ScanResultPanel({
 
   return (
     <div className={`flex flex-col gap-3 ${className}`}>
-      {/* Primary result */}
       <Card variant={cardVariant}>
-        <div className="flex items-start justify-between">
-          <div>
-            <Badge variant="gold">
-              {primaryItem.confidence}% Match
-            </Badge>
-            <h3
-              className="mt-2 text-lg font-semibold"
-              style={{ color: 'var(--on-surface)', fontFamily: 'var(--font-display)' }}
-            >
-              {primaryItem.name}
-            </h3>
-          </div>
-          <Icon name="verified" fill size={20} style={{ color: 'var(--success)' }} />
-        </div>
+        {badge && <Badge variant="gold">{badge}</Badge>}
+        <h3
+          className="mt-2 text-lg font-semibold leading-snug"
+          style={{ color: 'var(--on-surface)', fontFamily: 'var(--font-display)', textWrap: 'balance' }}
+        >
+          {title}
+        </h3>
+        {subtitle && (
+          <p className="mt-0.5 text-xs" style={{ color: 'var(--on-surface-muted)' }}>
+            {subtitle}
+          </p>
+        )}
 
         <GoldDivider variant="gradient" className="my-3" />
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <span className="text-xs uppercase tracking-wider" style={{ color: 'var(--on-surface-muted)' }}>
-            {variant === 'light' ? 'Suggested Selling Price' : 'Hammer Projection'}
+            {valueLabel}
           </span>
           <span
             className="text-xl font-bold tabular-nums"
             style={{ color: 'var(--primary)', fontFamily: 'var(--font-display)' }}
           >
-            {primaryItem.estimatedValue}
+            {value}
           </span>
         </div>
-        {primaryItem.margin && (
-          <div className="mt-1 flex items-center justify-between">
+        {range && (
+          <div className="mt-1 flex items-center justify-between gap-3">
             <span className="text-xs" style={{ color: 'var(--on-surface-muted)' }}>
-              Estimated Margin
+              Asking range
             </span>
-            <Badge variant="success">{primaryItem.margin}</Badge>
+            <span className="text-sm tabular-nums" style={{ color: 'var(--on-surface-variant)' }}>
+              {range.low} – {range.high}
+            </span>
           </div>
         )}
       </Card>
 
-      {/* Secondary items */}
-      {secondaryItems.length > 0 && (
+      {listings.length > 0 && (
         <Card variant={cardVariant}>
           <h4
             className="mb-2 text-xs font-semibold uppercase tracking-wider"
             style={{ color: 'var(--primary)', fontFamily: 'var(--font-body)' }}
           >
-            Also Detected
+            {listingsTitle}
           </h4>
-          <div className="flex flex-col gap-2">
-            {secondaryItems.map((item, i) => (
-              <div key={i} className="flex items-center justify-between py-1">
-                <div className="flex items-center gap-2">
-                  <Icon name="image_search" size={16} style={{ color: 'var(--on-surface-variant)' }} />
-                  <span className="text-sm" style={{ color: 'var(--on-surface)' }}>
-                    {item.name}
+          <ul className="flex flex-col">
+            {listings.map((item) => {
+              const content = (
+                <>
+                  <div className="flex min-w-0 flex-col">
+                    <span className="line-clamp-2 text-sm" style={{ color: 'var(--on-surface)' }}>
+                      {item.name}
+                    </span>
+                    {(item.condition || item.matchScore !== undefined) && (
+                      <span className="text-xs" style={{ color: 'var(--on-surface-muted)' }}>
+                        {[item.condition, item.matchScore !== undefined ? `${item.matchScore}% word match` : null]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </span>
+                    )}
+                  </div>
+                  <span className="flex shrink-0 items-center gap-1">
+                    <span className="text-sm font-semibold tabular-nums" style={{ color: 'var(--primary)' }}>
+                      {item.price}
+                    </span>
+                    {item.href && <Icon name="open_in_new" size={14} style={{ color: 'var(--on-surface-muted)' }} />}
                   </span>
-                </div>
-                <span
-                  className="text-sm font-semibold tabular-nums"
-                  style={{ color: 'var(--primary)' }}
-                >
-                  {item.estimatedValue}
-                </span>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-
-      {/* Total value */}
-      {totalValue && (
-        <Card variant={cardVariant}>
-          <div className="flex items-center justify-between">
-            <span
-              className="text-sm font-semibold uppercase tracking-wider"
-              style={{ color: 'var(--primary)', fontFamily: 'var(--font-body)' }}
-            >
-              Cumulative Arbitrage
-            </span>
-            <span
-              className="text-2xl font-bold tabular-nums"
-              style={{ color: 'var(--primary)', fontFamily: 'var(--font-display)' }}
-            >
-              {totalValue}
-            </span>
-          </div>
+                </>
+              )
+              return (
+                <li key={item.id} className="border-b last:border-b-0" style={{ borderColor: 'var(--border-subtle)' }}>
+                  {item.href ? (
+                    <a
+                      href={item.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-between gap-3 py-2.5 no-underline"
+                    >
+                      {content}
+                    </a>
+                  ) : (
+                    <div className="flex items-center justify-between gap-3 py-2.5">{content}</div>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
         </Card>
       )}
     </div>

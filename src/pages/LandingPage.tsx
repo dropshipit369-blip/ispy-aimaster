@@ -3,38 +3,31 @@ import { Button, Icon, Badge, GoldDivider, Card } from '@/components'
 
 const FEATURES = [
   {
-    icon: 'center_focus_strong',
-    title: 'Instant AI Scanning',
-    desc: 'Point, shoot, profit. Our AI identifies items and fetches real-time market data in under a second.',
+    icon: 'photo_camera',
+    title: 'Snap It or Type It',
+    desc: 'Photograph an item and our AI reads labels, logos and model numbers to name it. Or just type what it is.',
   },
   {
-    icon: 'trending_up',
-    title: 'Margin Intelligence',
-    desc: 'Know your profit before you buy. See estimated selling prices, margins, and the best sales channels.',
+    icon: 'storefront',
+    title: 'Live eBay AU Prices',
+    desc: 'See the median, low and high asking prices from current eBay AU listings in seconds, with links to each one.',
   },
   {
-    icon: 'shield',
-    title: 'Authenticity Verification',
-    desc: 'AI-powered provenance checking cross-references serial numbers, materials, and known counterfeits.',
+    icon: 'diamond',
+    title: 'Pre-owned Market Check',
+    desc: 'Filter to pre-owned listings only, so a used bag or watch is compared with used, not brand new.',
   },
   {
-    icon: 'analytics',
-    title: 'Market Analytics',
-    desc: 'Track price trends, seasonal demand, and comparable sales across eBay, Depop, Facebook Marketplace, and more.',
+    icon: 'history',
+    title: 'Every Scan Saved',
+    desc: 'Your scans are saved with the prices at the time, so you can review your haul when you get home.',
   },
 ]
 
-const TESTIMONIALS = [
-  {
-    quote: 'Found a $400 vintage jacket at an op shop for $12. iSpy told me exactly what it was worth before I even picked it up.',
-    name: 'Sarah K.',
-    role: 'Vintage Reseller, Sydney',
-  },
-  {
-    quote: 'I use iSpy at every garage sale and auction. It paid for itself in the first weekend.',
-    name: 'Marcus T.',
-    role: 'eBay Power Seller',
-  },
+const HOW_IT_WORKS = [
+  { icon: 'photo_camera', title: 'Point your camera', desc: 'Take a photo of one item at the op shop, market or auction.' },
+  { icon: 'auto_awesome', title: 'iSpy identifies it', desc: 'AI names the brand and model and builds the right eBay search.' },
+  { icon: 'payments', title: 'Decide in seconds', desc: "Compare today's eBay AU asking prices with the price tag before you buy." },
 ]
 
 export function LandingPage() {
@@ -79,8 +72,8 @@ export function LandingPage() {
           className="mx-auto mt-4 max-w-sm text-base leading-relaxed"
           style={{ color: 'var(--on-surface-variant)' }}
         >
-          AI-powered scanning that instantly identifies items, checks authenticity,
-          and shows you the profit — all from your phone camera.
+          Photograph an item, let AI identify it, and see what similar items are listed for on
+          eBay AU — before you hand over any cash.
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
           <Button
@@ -135,42 +128,40 @@ export function LandingPage() {
 
       <GoldDivider variant="gradient" className="mx-5" />
 
-      {/* Social proof */}
+      {/* How it works */}
       <section className="px-5 py-10">
         <h2
           className="mb-6 text-center text-2xl font-semibold"
           style={{ fontFamily: 'var(--font-display)', color: 'var(--on-surface)' }}
         >
-          Resellers Love iSpy
+          How It Works
         </h2>
-        <div className="flex flex-col gap-4">
-          {TESTIMONIALS.map((t) => (
-            <Card key={t.name} variant="elevated">
-              <p
-                className="text-sm italic leading-relaxed"
-                style={{ color: 'var(--on-surface)' }}
-              >
-                "{t.quote}"
-              </p>
-              <div className="mt-3 flex items-center gap-2">
+        <ol className="flex flex-col gap-4">
+          {HOW_IT_WORKS.map((step, i) => (
+            <li key={step.title}>
+              <Card variant="elevated" className="flex items-start gap-3">
                 <div
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold tabular-nums"
                   style={{ background: 'var(--primary-tint)', color: 'var(--primary)' }}
                 >
-                  {t.name[0]}
+                  {i + 1}
                 </div>
                 <div>
-                  <p className="text-sm font-semibold" style={{ color: 'var(--on-surface)' }}>
-                    {t.name}
+                  <p className="flex items-center gap-1.5 text-sm font-semibold" style={{ color: 'var(--on-surface)' }}>
+                    <Icon name={step.icon} size={16} style={{ color: 'var(--primary)' }} />
+                    {step.title}
                   </p>
-                  <p className="text-xs" style={{ color: 'var(--on-surface-muted)' }}>
-                    {t.role}
+                  <p className="mt-0.5 text-sm leading-relaxed" style={{ color: 'var(--on-surface-variant)' }}>
+                    {step.desc}
                   </p>
                 </div>
-              </div>
-            </Card>
+              </Card>
+            </li>
           ))}
-        </div>
+        </ol>
+        <p className="mt-4 text-center text-xs leading-relaxed" style={{ color: 'var(--on-surface-muted)' }}>
+          Prices shown are current asking prices from active listings, not completed sales.
+        </p>
       </section>
 
       {/* Final CTA */}
@@ -188,7 +179,7 @@ export function LandingPage() {
           <span style={{ color: 'var(--primary)' }}>Start Knowing.</span>
         </h2>
         <p className="mx-auto mt-3 max-w-sm text-sm" style={{ color: 'var(--on-surface-variant)' }}>
-          Join thousands of Australian resellers using AI to find hidden profit in everyday items.
+          Built in Melbourne for Australian resellers. Start with 3 free market scans a day — no card needed.
         </p>
         <Button
           variant="gold"
