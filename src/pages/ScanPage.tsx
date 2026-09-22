@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ScanViewfinder, ScanResultPanel, FibonacciSpiral, Badge, Icon, Button, StatTile, Card, CameraCapture } from '@/components'
+import { ScanViewfinder, ScanResultPanel, FibonacciSpiral, Badge, Icon, Button, StatTile, Card, CameraCapture, BrandLockup } from '@/components'
 import { useMarketScan } from '@/hooks/useMarketScan'
 import { formatMoney, formatResetTime } from '@/lib/format'
 import { ApiError } from '@/services/functions'
@@ -82,12 +82,7 @@ export function ScanPage() {
         className="flex items-center justify-between px-4 py-3"
         style={{ paddingTop: 'calc(var(--status-bar-height, 0px) + 12px)' }}
       >
-        <div className="flex items-center gap-2">
-          <span className="text-xl font-semibold" style={{ fontFamily: 'var(--font-display)', color: 'var(--primary)' }}>
-            iSpy
-          </span>
-          <Badge variant="gold">AI</Badge>
-        </div>
+        <BrandLockup size={30} />
         <div className="flex items-center gap-2">
           <button
             type="button"

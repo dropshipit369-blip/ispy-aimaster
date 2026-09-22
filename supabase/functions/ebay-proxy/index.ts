@@ -1,7 +1,7 @@
 import { adminClient, requireUser, secureHandler } from "../_shared/security.ts";
 import { boundedFetch, HttpError, json } from "../_shared/http.ts";
 /**
- * ebay-proxy — eBay API gateway (sandbox/production switchable).
+ * ebay-proxy — eBay API gateway (production by default; sandbox via EBAY_ENV).
  *
  * Exchanges the app's client credentials for an application access token
  * (cached in-memory until expiry) and proxies a safe, allow-listed set of
@@ -12,10 +12,18 @@ import { boundedFetch, HttpError, json } from "../_shared/http.ts";
  * allowance (ispy_consume_market_scan). The allowance is enforced here, on the
  * server, and refunded if the eBay lookup itself fails.
  *
+ * Each search also reserves one call from the shared eBay budget with purpose
+ * "customer" (reserve_ebay_budget). App scans outrank the auction harvester, so
+ * the harvester can no longer use up the day's eBay calls that customers need.
+ *
  * Secrets (set in Supabase dashboard → Edge Functions → Secrets):
- *  - EBAY_CLIENT_ID   e.g. joelmcvi-ispyai-SBX-...
- *  - EBAY_CERT_ID     the matching Client Secret (EBAY_CLIENT_SECRET also accepted)
- *  - EBAY_ENV         "sandbox" (default) | "production"
+ *  - EBAY_CLIENT_ID   production App ID (Client ID)
+ *  - EBAY_CERT_ID     the matching Client Secret (falls back to EBAY_CLIENT_SECRET)
+ *  - EBAY_ENV         "production" (default) | "sandbox"
+ *    The project's keys are production keys (harvest-auctions uses the same ones against
+ *    api.ebay.com), so an unset EBAY_ENV must mean production: pointing production keys at the
+ *    sandbox host fails the token grant and breaks every scan. Set EBAY_ENV=sandbox explicitly
+ *    only with sandbox keys.
  *
  * Actions (POST JSON body):
  *  - { action: "search", q: string, limit?: number, marketplaceId?: string, condition?: "new" | "used" }
@@ -50,8 +58,8 @@ const CONDITION_FILTERS: Record<string, string> = {
 const MARKETPLACES = new Set(["EBAY_AU", "EBAY_US", "EBAY_GB"]);
 
 function ebayHosts() {
-  const env = (Deno.env.get("EBAY_ENV") || "sandbox").toLowerCase();
-  const isProd = env === "production";
+  const env = (Deno.env.get("EBAY_ENV") || "production").trim().toLowerCase();
+  const isProd = env !== "sandbox";
   return {
     env: isProd ? "production" : "sandbox",
     api: isProd ? "https://api.ebay.com" : "https://api.sandbox.ebay.com",
@@ -65,8 +73,9 @@ async function getAppToken(): Promise<{ token: string; env: string }> {
     return { token: tokenCache.accessToken, env };
   }
 
-  const clientId = Deno.env.get("EBAY_CLIENT_ID");
-  const certId = Deno.env.get("EBAY_CLIENT_SECRET") ?? Deno.env.get("EBAY_CERT_ID");
+  // Same lookup order as harvest-auctions, whose production token grant is proven daily.
+  const clientId = Deno.env.get("EBAY_CLIENT_ID")?.trim();
+  const certId = (Deno.env.get("EBAY_CERT_ID") ?? Deno.env.get("EBAY_CLIENT_SECRET"))?.trim();
   if (!clientId || !certId) {
     throw new HttpError(503, "Market data is not configured. Please contact support.", "ebay_configuration_missing");
   }
@@ -192,6 +201,23 @@ Deno.serve(secureHandler("ebay-proxy", async (req: Request) => {
         code: "scan_limit_reached",
         ...publicQuota(allowance),
       }, 402);
+    }
+
+    // Reserve this search's eBay call from the customer share of the daily budget. Fail open on a
+    // budget-store error: the table is a guard, eBay itself remains the hard limit.
+    const { data: slot, error: slotError } = await db.rpc("reserve_ebay_budget", {
+      p_browse: 1, p_bulk: 0, p_purpose: "customer",
+    });
+    const reserved = Array.isArray(slot) ? slot[0] : slot;
+    if (slotError) {
+      console.error(JSON.stringify({ event: "ebay_budget_unavailable", route: "ebay-proxy" }));
+    } else if (reserved && reserved.allowed === false) {
+      await db.rpc("ispy_refund_market_scan", { p_user_id: user.id, p_usage_day: allowance.usage_day });
+      console.error(JSON.stringify({ event: "ebay_customer_budget_exhausted" }));
+      return json({
+        error: "Live eBay prices have hit today's limit. They're back after 5pm AEST (6pm AEDT). This scan wasn't counted.",
+        code: "market_capacity_reached",
+      }, 429, { "Retry-After": "3600" });
     }
 
     try {

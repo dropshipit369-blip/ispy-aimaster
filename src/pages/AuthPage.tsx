@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
-import { Button, Icon, Badge, GoldDivider } from '@/components'
+import { Button, Icon, GoldDivider, BrandLogo } from '@/components'
 
 export function AuthPage() {
   const navigate = useNavigate()
@@ -60,15 +60,9 @@ export function AuthPage() {
   return (
     <div className="flex min-h-screen flex-col" style={{ background: 'var(--bg)' }}>
       {/* Header */}
-      <div className="px-5 pt-16 text-center">
-        <span
-          className="text-3xl font-bold"
-          style={{ fontFamily: 'var(--font-display)', color: 'var(--primary)' }}
-        >
-          iSpy
-        </span>
-        <Badge variant="gold" className="ml-2">AI</Badge>
-        <p className="mt-2 text-sm" style={{ color: 'var(--on-surface-variant)' }}>
+      <div className="px-5 pt-12 text-center">
+        <BrandLogo variant="full" size={128} className="mx-auto" />
+        <p className="mt-3 text-sm" style={{ color: 'var(--on-surface-variant)' }}>
           {mode === 'login' ? 'Welcome back, operator.' : 'Join the intelligence network.'}
         </p>
       </div>

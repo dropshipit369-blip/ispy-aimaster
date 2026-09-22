@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ScanViewfinder, ScanResultPanel, FibonacciSpiral, Badge, Icon, Button, Card } from '@/components'
+import { ScanViewfinder, ScanResultPanel, FibonacciSpiral, Badge, Icon, Button, Card, BrandLockup } from '@/components'
 import { useMarketScan } from '@/hooks/useMarketScan'
 import { formatMoney, formatResetTime } from '@/lib/format'
 import { isUnlimited } from '@/services/usage'
@@ -21,12 +21,7 @@ export function DarkScanPage() {
         style={{ paddingTop: 'calc(var(--status-bar-height, 0px) + 16px)' }}
       >
         <div className="flex items-center gap-3">
-          <span
-            className="text-2xl font-semibold tracking-tight"
-            style={{ fontFamily: "'Cinzel', var(--font-display)", color: 'var(--primary)', letterSpacing: '0.05em' }}
-          >
-            iSpy
-          </span>
+          <BrandLockup size={30} />
           <Badge variant="gold">CURATOR</Badge>
         </div>
         <div className="flex items-center gap-1">

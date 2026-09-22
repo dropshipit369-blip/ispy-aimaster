@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Button, Icon, Badge, GoldDivider, Card } from '@/components'
+import { Button, Icon, Badge, GoldDivider, Card, BrandLogo, BrandLockup } from '@/components'
 
 const FEATURES = [
   {
@@ -37,15 +37,7 @@ export function LandingPage() {
     <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
       {/* Nav */}
       <nav className="flex items-center justify-between px-5 py-4" style={{ paddingTop: 'calc(var(--status-bar-height) + 12px)' }}>
-        <div className="flex items-center gap-2">
-          <span
-            className="text-2xl font-bold"
-            style={{ fontFamily: 'var(--font-display)', color: 'var(--primary)' }}
-          >
-            iSpy
-          </span>
-          <Badge variant="gold">AI</Badge>
-        </div>
+        <BrandLockup size={36} />
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={() => navigate('/pricing')}>
             Pricing
@@ -57,7 +49,8 @@ export function LandingPage() {
       </nav>
 
       {/* Hero */}
-      <section className="px-5 pb-10 pt-8 text-center">
+      <section className="px-5 pb-10 pt-6 text-center">
+        <BrandLogo variant="full" size={148} className="mx-auto mb-5" />
         <Badge variant="gold" className="mb-4">
           <Icon name="auto_awesome" size={12} /> Resale Intelligence
         </Badge>
@@ -195,7 +188,7 @@ export function LandingPage() {
       {/* Footer */}
       <footer className="px-5 py-6 text-center" style={{ borderTop: '1px solid var(--border-divider)' }}>
         <p className="text-xs" style={{ color: 'var(--on-surface-muted)' }}>
-          © 2026 iSpy AI · Melbourne, Australia · ABN pending
+          © 2026 ispy.ai · Melbourne, Australia · ABN pending
         </p>
         <div className="mt-2 flex justify-center gap-4">
           {['Terms', 'Privacy', 'Contact'].map((link) => (
