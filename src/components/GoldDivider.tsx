@@ -7,7 +7,7 @@ export function GoldDivider({ className = '', variant = 'thin' }: GoldDividerPro
   if (variant === 'gradient') {
     return (
       <div
-        className={`h-px w-full ${className}`}
+        className={`h-px self-stretch ${className}`}
         style={{
           background: 'linear-gradient(90deg, transparent 0%, var(--primary-container) 50%, transparent 100%)',
         }}
@@ -26,7 +26,7 @@ export function GoldDivider({ className = '', variant = 'thin' }: GoldDividerPro
 
   return (
     <div
-      className={`h-px w-full ${className}`}
+      className={`h-px self-stretch ${className}`}
       style={{ background: 'var(--border-divider)' }}
     />
   )
