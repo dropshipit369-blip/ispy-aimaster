@@ -28,7 +28,7 @@ const variantStyles: Record<BadgeVariant, CSSProperties> = {
     color: 'var(--error)',
   },
   info: {
-    background: 'rgba(96, 165, 250, 0.1)',
+    background: 'var(--secondary-container)',
     color: 'var(--secondary)',
   },
   subtle: {

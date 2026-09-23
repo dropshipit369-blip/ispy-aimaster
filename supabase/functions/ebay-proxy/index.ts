@@ -1,5 +1,6 @@
 import { adminClient, requireUser, secureHandler } from "../_shared/security.ts";
 import { boundedFetch, HttpError, json } from "../_shared/http.ts";
+import { normaliseGtin } from "./gtin.ts";
 /**
  * ebay-proxy — eBay API gateway (production by default; sandbox via EBAY_ENV).
  *
@@ -26,8 +27,9 @@ import { boundedFetch, HttpError, json } from "../_shared/http.ts";
  *    only with sandbox keys.
  *
  * Actions (POST JSON body):
- *  - { action: "search", q: string, limit?: number, marketplaceId?: string, condition?: "new" | "used" }
- *      → Browse API item_summary search (active listings) + remaining allowance
+ *  - { action: "search", q?: string, gtin?: string, limit?: number, marketplaceId?: string, condition?: "new" | "used" }
+ *      → Browse API item_summary search (active listings) + remaining allowance.
+ *        Send q (keywords), gtin (a scanned UPC/EAN/ISBN, 8–14 digits), or both.
  *  - { action: "health" }
  *      → token grant check, returns environment + expiry (does not consume a scan)
  */
@@ -107,7 +109,8 @@ async function getAppToken(): Promise<{ token: string; env: string }> {
 }
 
 async function browseSearch(params: {
-  q: string;
+  q?: string;
+  gtin?: string;
   limit?: number;
   marketplaceId?: string;
   condition?: string;
@@ -116,7 +119,8 @@ async function browseSearch(params: {
   const { api } = ebayHosts();
 
   const url = new URL(`${api}/buy/browse/v1/item_summary/search`);
-  url.searchParams.set("q", params.q.slice(0, 200));
+  if (params.q) url.searchParams.set("q", params.q.slice(0, 200));
+  if (params.gtin) url.searchParams.set("gtin", params.gtin);
   url.searchParams.set("limit", String(Math.min(Math.max(params.limit ?? 10, 1), 50)));
   if (params.condition && CONDITION_FILTERS[params.condition]) {
     url.searchParams.set("filter", CONDITION_FILTERS[params.condition]);
@@ -183,7 +187,10 @@ Deno.serve(secureHandler("ebay-proxy", async (req: Request) => {
 
   if (action === "search") {
     const q = typeof body?.q === "string" ? body.q.trim() : "";
-    if (!q) throw new HttpError(400, "Enter an item to scan.", "query_required");
+    const gtinInput = typeof body?.gtin === "string" && body.gtin.trim() ? body.gtin : null;
+    const gtin = gtinInput ? normaliseGtin(gtinInput) : null;
+    if (gtinInput && !gtin) throw new HttpError(400, "That barcode number isn't valid. Check the digits under the barcode and retry.", "gtin_invalid");
+    if (!q && !gtin) throw new HttpError(400, "Enter an item to scan.", "query_required");
     if (q.length > 200) throw new HttpError(400, "Keep the search under 200 characters.", "query_too_long");
     const condition = body?.condition === "new" || body?.condition === "used" ? body.condition : undefined;
     const marketplaceId = typeof body?.marketplaceId === "string" && MARKETPLACES.has(body.marketplaceId) ? body.marketplaceId : undefined;
@@ -222,7 +229,8 @@ Deno.serve(secureHandler("ebay-proxy", async (req: Request) => {
 
     try {
       const result = await browseSearch({
-        q,
+        q: q || undefined,
+        gtin: gtin ?? undefined,
         limit: typeof body?.limit === "number" ? body.limit : undefined,
         marketplaceId,
         condition,

@@ -4,7 +4,6 @@ import { ProtectedRoute } from './components/ProtectedRoute'
 import { LandingPage } from './pages/LandingPage'
 import { AuthPage } from './pages/AuthPage'
 import { ScanPage } from './pages/ScanPage'
-import { DarkScanPage } from './pages/DarkScanPage'
 import { HistoryPage } from './pages/HistoryPage'
 import { PricingPage } from './pages/PricingPage'
 import { ProfilePage } from './pages/ProfilePage'
@@ -20,8 +19,9 @@ export function App() {
 
       {/* Protected in-app routes — with bottom nav */}
       <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-        <Route path="/scan" element={<ScanPage />} />
-        <Route path="/scan/dark" element={<DarkScanPage />} />
+        <Route path="/scan" element={<ScanPage key="scan-any" />} />
+        {/* Former "Curator" screen: the same scanner, filtered to pre-owned listings. */}
+        <Route path="/scan/dark" element={<ScanPage key="scan-used" initialCondition="used" />} />
         <Route path="/history" element={<HistoryPage />} />
         <Route path="/pricing" element={<PricingPage />} />
         {/* Stripe Checkout and the billing portal return here (see supabase/functions/_shared/billing.ts). */}

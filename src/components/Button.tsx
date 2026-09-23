@@ -33,7 +33,8 @@ const variantStyles: Record<ButtonVariant, React.CSSProperties> = {
   },
   gold: {
     background: 'linear-gradient(135deg, var(--primary-container) 0%, var(--primary) 100%)',
-    color: '#1a1614',
+    color: 'var(--ispy-obsidian)',
+    boxShadow: '0 6px 18px -8px rgba(153, 122, 56, 0.7)',
     border: 'none',
     fontWeight: 600,
   },

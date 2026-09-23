@@ -26,16 +26,27 @@ interface ProxySearchResult {
  */
 export async function searchEbay(
   query: string,
-  options: { limit?: number; condition?: ConditionFilter } = {},
+  options: { limit?: number; condition?: ConditionFilter; gtin?: string } = {},
 ): Promise<ScanResponse> {
   const condition = options.condition ?? 'any'
   const data = await callFunction<ProxySearchResult>('ebay-proxy', {
     action: 'search',
-    q: query,
+    ...(query.trim() ? { q: query } : {}),
+    ...(options.gtin ? { gtin: options.gtin } : {}),
     limit: options.limit ?? 12,
     ...(condition === 'any' ? {} : { condition }),
   })
-  return transformResponse(query, condition, data)
+  const label = query.trim() || (options.gtin ? `Barcode ${options.gtin}` : '')
+  return transformResponse(label, condition, data, Boolean(options.gtin && !query.trim()))
+}
+
+/** Digits-only barcode with a valid GS1 check digit (UPC-A, EAN-8, EAN-13/ISBN-13, GTIN-14), or null. */
+export function normaliseBarcode(value: string): string | null {
+  const digits = value.replace(/[\s-]/g, '')
+  if (!/^\d{8}$|^\d{12,14}$/.test(digits)) return null
+  const body = digits.slice(0, -1).split('').reverse().map(Number)
+  const sum = body.reduce((acc, d, i) => acc + d * (i % 2 === 0 ? 3 : 1), 0)
+  return (10 - (sum % 10)) % 10 === Number(digits.at(-1)) ? digits : null
 }
 
 let environmentPromise: Promise<'production' | 'sandbox' | 'unknown'> | null = null
@@ -51,13 +62,14 @@ export function getMarketEnvironment(): Promise<'production' | 'sandbox' | 'unkn
   return environmentPromise
 }
 
-function transformResponse(query: string, condition: ConditionFilter, data: ProxySearchResult): ScanResponse {
+function transformResponse(query: string, condition: ConditionFilter, data: ProxySearchResult, exactProduct = false): ScanResponse {
   const items: ScanResult[] = (data.items ?? [])
     .filter((item) => Number.isFinite(item.price) && item.price > 0)
     .map((item) => ({
       id: item.itemId,
       name: item.title,
-      matchScore: matchScore(item.title, query),
+      // A barcode search returns listings eBay has tied to that exact product.
+      matchScore: exactProduct ? 100 : matchScore(item.title, query),
       price: item.price,
       currency: item.currency || 'AUD',
       priceLabel: formatMoney(item.price, item.currency || 'AUD'),

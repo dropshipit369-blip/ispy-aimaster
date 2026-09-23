@@ -23,10 +23,11 @@ const variantMap: Record<string, CSSProperties> = {
     boxShadow: 'var(--shadow-card)',
   },
   frosted: {
-    background: 'rgba(255, 255, 255, 0.85)',
+    background: 'rgba(255, 253, 249, 0.85)',
     backdropFilter: 'blur(20px)',
     WebkitBackdropFilter: 'blur(20px)',
-    border: '1px solid rgba(255, 255, 255, 0.3)',
+    border: '1px solid var(--outline-variant)',
+    boxShadow: 'var(--shadow-card)',
   },
 }
 

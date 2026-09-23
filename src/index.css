@@ -4,9 +4,16 @@
 @theme {
   /* Gold accent family */
   --color-gold: #c5a869;
+  --color-gold-light: #e4cd98;
+  --color-gold-ink: #7a5f26;
+  --color-obsidian: #1a1816;
+  --color-charcoal: #282522;
+  --color-wave-teal: #2b5876;
+  --color-wave-deep: #1b3b52;
+  --color-cream: #fcf8f2;
   --color-gold-bright: #dfc78d;
-  --color-gold-deep: #8c6d23;
-  --color-gold-dark: #725b24;
+  --color-gold-deep: #997a38;
+  --color-gold-dark: #997a38;
 
   /* Brand semantic */
   --color-surface: var(--surface);
@@ -21,7 +28,8 @@
 
   /* Typography */
   --font-display: 'Playfair Display', Georgia, serif;
-  --font-body: 'Manrope', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-body: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-accent: 'Cormorant Garamond', 'Playfair Display', Georgia, serif;
 
   /* Spacing */
   --spacing-gutter: var(--gutter);

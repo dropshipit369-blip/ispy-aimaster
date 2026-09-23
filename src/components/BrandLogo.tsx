@@ -15,7 +15,7 @@ export function BrandLogo({ variant = 'mark', size = 36, className = '' }: Brand
       alt="ispy.ai"
       decoding="async"
       className={`shrink-0 rounded-full ${className}`}
-      style={{ width: size, height: size }}
+      style={{ width: size, height: size, boxShadow: '0 0 0 1px var(--primary-border), 0 4px 14px -6px rgba(26, 24, 22, 0.45)' }}
     />
   )
 }

@@ -18,6 +18,16 @@ const FEATURES = [
     desc: 'Filter to pre-owned listings only, so a used bag or watch is compared with used, not brand new.',
   },
   {
+    icon: 'barcode_scanner',
+    title: 'Barcodes and Whole Lots',
+    desc: 'Scan a UPC, EAN or ISBN for an exact product match, or photograph a box of items and price the ones worth it.',
+  },
+  {
+    icon: 'savings',
+    title: 'Profit After eBay Fees',
+    desc: "Enter what you'd pay and see your margin after eBay AU fees, whether you sell fee-free or on a Pro plan.",
+  },
+  {
     icon: 'history',
     title: 'Every Scan Saved',
     desc: 'Your scans are saved with the prices at the time, so you can review your haul when you get home.',

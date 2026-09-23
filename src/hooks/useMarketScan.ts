@@ -34,15 +34,15 @@ export function useMarketScan(condition: ConditionFilter) {
   const outOfScans = allowance !== null && allowance.scans_remaining === 0
 
   const runScan = useCallback(
-    async (query: string): Promise<ScanResponse | null> => {
+    async (query: string, options: { gtin?: string } = {}): Promise<ScanResponse | null> => {
       const q = query.trim()
-      if (!q || !user) return null
+      if ((!q && !options.gtin) || !user) return null
       setSearching(true)
       setError(null)
       setResult(null)
       setHistoryWarning(false)
       try {
-        const data = await searchEbay(q, { limit: 12, condition })
+        const data = await searchEbay(q, { limit: 12, condition, gtin: options.gtin })
         setResult(data)
         if (data.allowance) setAllowance(data.allowance)
         saveScan(user.id, data).catch(() => setHistoryWarning(true))
