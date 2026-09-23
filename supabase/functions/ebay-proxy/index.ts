@@ -30,6 +30,9 @@ import { normaliseGtin } from "./gtin.ts";
  *  - { action: "search", q?: string, gtin?: string, limit?: number, marketplaceId?: string, condition?: "new" | "used" }
  *      → Browse API item_summary search (active listings) + remaining allowance.
  *        Send q (keywords), gtin (a scanned UPC/EAN/ISBN, 8–14 digits), or both.
+ *      The response also carries `sold`: real eBay AU sold prices for the same item from iSpy's own
+ *      sold-comps store (ispy_sold_comps_for_scan), honouring the condition filter. It costs no eBay
+ *      call and no extra scan, and a failure there never fails the search (sold is then null).
  *  - { action: "health" }
  *      → token grant check, returns environment + expiry (does not consume a scan)
  */
@@ -162,6 +165,37 @@ async function browseSearch(params: {
   return { total: data.total ?? items.length, items };
 }
 
+const SOLD_LOOKUP_TIMEOUT_MS = 2_500;
+
+/** Sold prices for a query from the sold-comps store. Best effort: null on error, timeout or no query. */
+async function soldComps(
+  db: ReturnType<typeof adminClient>,
+  query: string,
+  condition: string | undefined,
+): Promise<Record<string, unknown> | null> {
+  const q = query.trim();
+  if (!q) return null;
+  const params = { p_query: q.slice(0, 200), p_window_days: 365, p_condition: condition ?? null };
+  const lookup = db.rpc("ispy_sold_comps_for_scan", params).then(({ data, error }) => {
+    if (error) {
+      console.error(JSON.stringify({ event: "sold_comps_failed", code: error.code }));
+      return null;
+    }
+    return (data ?? null) as Record<string, unknown> | null;
+  });
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), SOLD_LOOKUP_TIMEOUT_MS);
+  });
+  try {
+    return await Promise.race([lookup, timeout]);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function publicQuota(q: Quota) {
   return {
     plan_type: q.plan_type,
@@ -228,6 +262,9 @@ Deno.serve(secureHandler("ebay-proxy", async (req: Request) => {
     }
 
     try {
+      // Sold prices are looked up alongside the live search, so they add no wait. Barcode-only scans
+      // skip them: the only words available are a random seller's title, which is too noisy to match.
+      const soldForQuery = q ? soldComps(db, q, condition) : Promise.resolve(null);
       const result = await browseSearch({
         q: q || undefined,
         gtin: gtin ?? undefined,
@@ -235,7 +272,8 @@ Deno.serve(secureHandler("ebay-proxy", async (req: Request) => {
         marketplaceId,
         condition,
       });
-      return json({ ...result, quota: publicQuota(allowance) });
+      const sold = await soldForQuery;
+      return json({ ...result, sold, quota: publicQuota(allowance) });
     } catch (error) {
       // The user should not lose a scan because eBay or our token grant failed.
       const { error: refundError } = await db.rpc("ispy_refund_market_scan", { p_user_id: user.id, p_usage_day: allowance.usage_day });

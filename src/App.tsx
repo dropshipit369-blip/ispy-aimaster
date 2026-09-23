@@ -8,6 +8,7 @@ import { HistoryPage } from './pages/HistoryPage'
 import { PricingPage } from './pages/PricingPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { MarketingKitPage } from './pages/MarketingKitPage'
+import { LegalPage } from './pages/LegalPage'
 
 export function App() {
   return (
@@ -16,6 +17,8 @@ export function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/auth" element={<AuthPage />} />
       <Route path="/marketing" element={<MarketingKitPage />} />
+      <Route path="/terms" element={<LegalPage key="terms" doc="terms" />} />
+      <Route path="/privacy" element={<LegalPage key="privacy" doc="privacy" />} />
 
       {/* Protected in-app routes — with bottom nav */}
       <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>

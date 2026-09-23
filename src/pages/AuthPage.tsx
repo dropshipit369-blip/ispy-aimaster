@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { Button, Icon, GoldDivider, BrandLogo } from '@/components'
 
@@ -151,7 +151,15 @@ export function AuthPage() {
       {/* Footer */}
       <div className="mt-auto px-5 pb-6 pt-8 text-center">
         <p className="text-[11px]" style={{ color: 'var(--on-surface-muted)' }}>
-          By continuing you agree to our Terms of Service and Privacy Policy.
+          By continuing you agree to our{' '}
+          <Link to="/terms" style={{ color: 'var(--primary)' }}>
+            Terms of Service
+          </Link>{' '}
+          and{' '}
+          <Link to="/privacy" style={{ color: 'var(--primary)' }}>
+            Privacy Policy
+          </Link>
+          .
         </p>
       </div>
     </div>

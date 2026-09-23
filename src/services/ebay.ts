@@ -1,7 +1,7 @@
 import { formatMoney } from '@/lib/format'
 import { callFunction } from '@/services/functions'
 import { allowanceFromDetails } from '@/services/usage'
-import type { ConditionFilter, ScanResponse, ScanResult } from '@/types/ebay'
+import type { ConditionFilter, ScanResponse, ScanResult, SoldBasis, SoldSale, SoldSummary } from '@/types/ebay'
 
 /** Response shape from the ebay-proxy edge function (`action: "search"`). */
 interface ProxySearchResult {
@@ -17,6 +17,7 @@ interface ProxySearchResult {
     marketplace: string
   }[]
   quota?: Record<string, unknown>
+  sold?: Record<string, unknown> | null
 }
 
 /**
@@ -97,6 +98,49 @@ function transformResponse(query: string, condition: ConditionFilter, data: Prox
     highPrice: prices.at(-1) ?? 0,
     timestamp: new Date().toISOString(),
     allowance: data.quota ? allowanceFromDetails(data.quota) : null,
+    sold: parseSold(data.sold),
+  }
+}
+
+const BASES: SoldBasis[] = ['confirmed', 'observed', 'estimated']
+const num = (v: unknown) => (typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : Number.NaN)
+
+/** Validates the sold summary from ebay-proxy. Anything malformed or thin becomes null (asking prices only). */
+export function parseSold(raw: unknown): SoldSummary | null {
+  if (!raw || typeof raw !== 'object') return null
+  const s = raw as Record<string, unknown>
+  if (s.status !== 'ok' || !BASES.includes(s.basis as SoldBasis)) return null
+  const count = num(s.count)
+  const median = num(s.median)
+  if (!Number.isFinite(count) || count < 3 || !Number.isFinite(median) || median <= 0) return null
+  const recent: SoldSale[] = Array.isArray(s.recent)
+    ? s.recent.flatMap((r): SoldSale[] => {
+        if (!r || typeof r !== 'object') return []
+        const x = r as Record<string, unknown>
+        const price = num(x.price)
+        if (typeof x.title !== 'string' || !Number.isFinite(price) || typeof x.endedAt !== 'string') return []
+        return [{
+          title: x.title,
+          price,
+          endedAt: x.endedAt,
+          url: safeEbayUrl(typeof x.url === 'string' ? x.url : null) || null,
+          format: typeof x.format === 'string' ? x.format : null,
+          basis: BASES.includes(x.basis as SoldBasis) ? (x.basis as SoldBasis) : (s.basis as SoldBasis),
+        }]
+      })
+    : []
+  return {
+    basis: s.basis as SoldBasis,
+    count,
+    confirmedCount: Number.isFinite(num(s.confirmedCount)) ? num(s.confirmedCount) : 0,
+    median,
+    p25: Number.isFinite(num(s.p25)) ? num(s.p25) : median,
+    p75: Number.isFinite(num(s.p75)) ? num(s.p75) : median,
+    oldest: typeof s.oldest === 'string' ? s.oldest : '',
+    newest: typeof s.newest === 'string' ? s.newest : '',
+    wideSpread: s.wideSpread === true,
+    windowDays: Number.isFinite(num(s.windowDays)) ? num(s.windowDays) : 365,
+    recent,
   }
 }
 

@@ -1,4 +1,5 @@
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { LEGAL } from '@/lib/legal'
 import { Button, Icon, Badge, GoldDivider, Card, BrandLogo, BrandLockup } from '@/components'
 
 const FEATURES = [
@@ -198,19 +199,18 @@ export function LandingPage() {
       {/* Footer */}
       <footer className="px-5 py-6 text-center" style={{ borderTop: '1px solid var(--border-divider)' }}>
         <p className="text-xs" style={{ color: 'var(--on-surface-muted)' }}>
-          © 2026 ispy.ai · Melbourne, Australia · ABN pending
+          © 2026 ispy.ai · Melbourne, Australia{LEGAL.abn ? ` · ABN ${LEGAL.abn}` : ''}
         </p>
-        <div className="mt-2 flex justify-center gap-4">
-          {['Terms', 'Privacy', 'Contact'].map((link) => (
-            <a
-              key={link}
-              href="#"
-              className="text-xs no-underline"
-              style={{ color: 'var(--primary)' }}
-            >
-              {link}
-            </a>
-          ))}
+        <div className="mt-2 flex justify-center gap-4 text-xs">
+          <Link to="/terms" className="no-underline" style={{ color: 'var(--primary)' }}>
+            Terms
+          </Link>
+          <Link to="/privacy" className="no-underline" style={{ color: 'var(--primary)' }}>
+            Privacy
+          </Link>
+          <a href={`mailto:${LEGAL.contactEmail}`} className="no-underline" style={{ color: 'var(--primary)' }}>
+            Contact
+          </a>
         </div>
       </footer>
     </div>

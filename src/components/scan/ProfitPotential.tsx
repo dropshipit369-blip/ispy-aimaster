@@ -14,8 +14,10 @@ function readPlan(): SellerPlan {
 }
 
 interface ProfitPotentialProps {
-  /** Median asking price from the latest scan, or null before a scan. */
+  /** Expected sale price for the latest scan (sold median when known, else median asking), or null. */
   salePrice: number | null
+  /** Whether salePrice is a median of real sales or of current asking prices. */
+  priceBasis: 'sold' | 'asking'
   currency: string
 }
 
@@ -34,11 +36,12 @@ function Wave() {
 }
 
 /**
- * Profit on the scanned item: median asking price minus what you'd pay and eBay AU's selling fees
- * for your plan. Postage is left out (the buyer pays it), though Pro-plan fees also apply to postage charged.
+ * Profit on the scanned item: the expected sale price (median of real sales when iSpy has them,
+ * otherwise median asking) minus what you'd pay and eBay AU's selling fees for your plan. Postage is
+ * left out (the buyer pays it), though Pro-plan fees also apply to postage charged.
+ * Remount with a new `key` per scan so the buy price starts empty for each item.
  */
-/** Remount with a new `key` per scan so the buy price starts empty for each item. */
-export function ProfitPotential({ salePrice, currency }: ProfitPotentialProps) {
+export function ProfitPotential({ salePrice, priceBasis, currency }: ProfitPotentialProps) {
   const id = useId()
   const [plan, setPlan] = useState<SellerPlan>(readPlan)
   const [buyInput, setBuyInput] = useState('')
@@ -143,8 +146,12 @@ export function ProfitPotential({ salePrice, currency }: ProfitPotentialProps) {
           </div>
           {estimate && (
             <p className="text-[11px] leading-snug tabular-nums" style={{ color: 'var(--on-surface-muted)' }}>
-              {formatMoney(salePrice, currency)} median asking − {formatMoney(estimate.fee, currency)} eBay fees −{' '}
-              {formatMoney(buyPrice, currency)} cost. Asking prices guide, not guarantee, the sale price. Postage not included{plan === 'pro_starter' ? '; on Pro plans eBay also takes 13.4% of any postage you charge' : ''}.
+              {formatMoney(salePrice, currency)} {priceBasis === 'sold' ? 'median sold' : 'median asking'} −{' '}
+              {formatMoney(estimate.fee, currency)} eBay fees − {formatMoney(buyPrice, currency)} cost.{' '}
+              {priceBasis === 'sold'
+                ? 'Based on what this item has actually sold for.'
+                : 'Asking prices guide, not guarantee, the sale price; items often sell for less.'}{' '}
+              Postage not included{plan === 'pro_starter' ? '; on Pro plans eBay also takes 13.4% of any postage you charge' : ''}.
             </p>
           )}
         </div>

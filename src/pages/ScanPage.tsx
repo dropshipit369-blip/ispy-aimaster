@@ -6,6 +6,8 @@ import { ModeBar } from '@/components/scan/ModeBar'
 import { modeHint, type ScanMode } from '@/components/scan/modes'
 import { ProfitPotential } from '@/components/scan/ProfitPotential'
 import { ScanHud } from '@/components/scan/ScanHud'
+import { SoldPanel } from '@/components/scan/SoldPanel'
+import { SOLD_BASIS_LABEL } from '@/lib/sold'
 import { useMarketScan } from '@/hooks/useMarketScan'
 import { formatMoney, formatResetTime } from '@/lib/format'
 import { fileToJpeg } from '@/lib/image'
@@ -177,22 +179,39 @@ export function ScanPage({ initialCondition = 'any' }: ScanPageProps) {
       ? `Barcode match • ${firstTitle ?? gtin}`
       : `${(result?.totalResults ?? 0).toLocaleString('en-AU')} live listings • eBay AU`
 
+  const sold = result?.sold ?? null
+  const askingRange = hasListings && result
+    ? `${formatMoney(result.lowPrice, result.currency)}–${formatMoney(result.highPrice, result.currency)}`
+    : null
+  const conditionLine = identified?.condition
+    ? { label: 'Condition (AI)', value: identified.condition, tone: 'gold' as const }
+    : null
+
+  // Sold prices lead when iSpy has enough real sales; live asking prices are the fallback.
   const hud = result ? (
-    <ScanHud
-      tag={hudTag}
-      headline={{
-        label: 'Median asking',
-        value: hasListings ? formatMoney(result.medianPrice, result.currency) : 'No listings yet',
-      }}
-      lines={[
-        ...(hasListings
-          ? [{ label: 'Asking range', value: `${formatMoney(result.lowPrice, result.currency)}–${formatMoney(result.highPrice, result.currency)}`, tone: 'green' as const }]
-          : []),
-        identified?.condition
-          ? { label: 'Condition (AI)', value: identified.condition, tone: 'gold' as const }
-          : { label: 'Listings found', value: result.totalResults.toLocaleString('en-AU'), tone: 'gold' as const },
-      ]}
-    />
+    sold ? (
+      <ScanHud
+        tag={hudTag}
+        headline={{ label: 'Sold median', value: formatMoney(sold.median) }}
+        lines={[
+          { label: 'Based on', value: SOLD_BASIS_LABEL[sold.basis](sold.count), tone: 'green' as const },
+          ...(hasListings ? [{ label: 'Asking now', value: formatMoney(result.medianPrice, result.currency), tone: 'plain' as const }] : []),
+          ...(conditionLine ? [conditionLine] : []),
+        ]}
+      />
+    ) : (
+      <ScanHud
+        tag={hudTag}
+        headline={{
+          label: 'Median asking',
+          value: hasListings ? formatMoney(result.medianPrice, result.currency) : 'No listings yet',
+        }}
+        lines={[
+          ...(askingRange ? [{ label: 'Asking range', value: askingRange, tone: 'green' as const }] : []),
+          conditionLine ?? { label: 'Listings found', value: result.totalResults.toLocaleString('en-AU'), tone: 'gold' as const },
+        ]}
+      />
+    )
   ) : null
 
   const busyLabel = identifying
@@ -438,33 +457,23 @@ export function ScanPage({ initialCondition = 'any' }: ScanPageProps) {
 
       <ProfitPotential
         key={result?.timestamp ?? 'none'}
-        salePrice={result && hasListings ? result.medianPrice : null}
-        currency={result?.currency ?? 'AUD'}
+        salePrice={sold ? sold.median : result && hasListings ? result.medianPrice : null}
+        priceBasis={sold ? 'sold' : 'asking'}
+        currency={sold ? 'AUD' : (result?.currency ?? 'AUD')}
       />
 
-      {identified && (identified.originStory || identified.salesStrategy) && (
-        <section className="marble-panel mx-4 mt-4 rounded-2xl p-4" style={{ border: '1px solid var(--outline-variant)' }}>
-          <Badge variant="gold">
-            <Icon name="auto_awesome" size={12} /> AI notes · {identified.name}
-          </Badge>
-          {identified.originStory && (
-            <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--on-surface-variant)' }}>
-              {identified.originStory}
-            </p>
-          )}
-          {identified.salesStrategy && (
-            <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--on-surface)' }}>
-              <strong>Selling tip:</strong> {identified.salesStrategy}
-              {identified.bestMarketplace ? ` (${identified.bestMarketplace})` : ''}
-            </p>
-          )}
-          <p className="mt-2 text-[11px]" style={{ color: 'var(--on-surface-muted)' }}>
-            AI identification can be wrong. Check labels and model numbers before you buy.
-          </p>
-        </section>
-      )}
-
       <div ref={panelRef} className="scroll-mt-4">
+        {sold && (
+          <div className="px-4 pt-4" style={{ animation: 'fadeInUp 0.35s ease-out' }}>
+            <SoldPanel sold={sold} />
+          </div>
+        )}
+        {result && !sold && hasListings && (
+          <p className="px-4 pt-4 text-xs leading-snug" style={{ color: 'var(--on-surface-muted)' }}>
+            iSpy doesn’t have enough recent eBay AU sales of this item yet, so the figures below are asking prices.
+            Items often sell for less than they’re listed at.
+          </p>
+        )}
         {result && hasListings && (
           <div className="px-4 pb-6 pt-4" style={{ animation: 'fadeInUp 0.4s ease-out' }}>
             <ScanResultPanel
@@ -507,6 +516,27 @@ export function ScanPage({ initialCondition = 'any' }: ScanPageProps) {
           </p>
         )}
       </div>
+      {identified && (identified.originStory || identified.salesStrategy) && (
+        <section className="marble-panel mx-4 mb-6 mt-2 rounded-2xl p-4" style={{ border: '1px solid var(--outline-variant)' }}>
+          <Badge variant="gold">
+            <Icon name="auto_awesome" size={12} /> AI notes · {identified.name}
+          </Badge>
+          {identified.originStory && (
+            <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--on-surface-variant)' }}>
+              {identified.originStory}
+            </p>
+          )}
+          {identified.salesStrategy && (
+            <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--on-surface)' }}>
+              <strong>Selling tip:</strong> {identified.salesStrategy}
+              {identified.bestMarketplace ? ` (${identified.bestMarketplace})` : ''}
+            </p>
+          )}
+          <p className="mt-2 text-[11px]" style={{ color: 'var(--on-surface-muted)' }}>
+            AI identification can be wrong. Check labels and model numbers before you buy.
+          </p>
+        </section>
+      )}
     </div>
   )
 }
