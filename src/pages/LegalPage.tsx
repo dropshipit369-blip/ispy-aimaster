@@ -138,7 +138,9 @@ function Privacy() {
       </P>
       <P>
         <strong>Scans:</strong> the items you search for or that iSpy identifies, the price results, and when you scanned,
-        so your History works. We also count scans per day and per month to apply your plan’s limits.
+        so your History works. We also count scans per day and per month to apply your plan’s limits. When
+        iSpy has too few sales for an item, it keeps the search words (never who searched) so it can collect
+        sold prices for that item from eBay.
       </P>
       <P>
         <strong>Photos:</strong> when you use Live Scan, Single Item upload or Lot Upload, your photo is resized on your

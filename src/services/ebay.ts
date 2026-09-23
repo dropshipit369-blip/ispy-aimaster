@@ -18,6 +18,7 @@ interface ProxySearchResult {
   }[]
   quota?: Record<string, unknown>
   sold?: Record<string, unknown> | null
+  soldTracking?: boolean
 }
 
 /**
@@ -99,6 +100,7 @@ function transformResponse(query: string, condition: ConditionFilter, data: Prox
     timestamp: new Date().toISOString(),
     allowance: data.quota ? allowanceFromDetails(data.quota) : null,
     sold: parseSold(data.sold),
+    soldTracking: data.soldTracking === true,
   }
 }
 

@@ -472,6 +472,14 @@ export function ScanPage({ initialCondition = 'any' }: ScanPageProps) {
           <p className="px-4 pt-4 text-xs leading-snug" style={{ color: 'var(--on-surface-muted)' }}>
             iSpy doesn’t have enough recent eBay AU sales of this item yet, so the figures below are asking prices.
             Items often sell for less than they’re listed at.
+            {result.soldTracking && (
+              <>
+                {' '}
+                <span style={{ color: 'var(--on-surface-variant)', fontWeight: 500 }}>
+                  iSpy is now tracking eBay AU auctions for this item. Sold prices usually show up within 1–10 days.
+                </span>
+              </>
+            )}
           </p>
         )}
         {result && hasListings && (

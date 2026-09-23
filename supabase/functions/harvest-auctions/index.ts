@@ -5,7 +5,7 @@
 // seconds after close). Watch auctions, settle after close, record the
 // realised price. Nothing is estimated.
 //
-// THREE BUGS LIVED HERE. The code looks the way it does because of them:
+// FIVE PROBLEMS LIVED HERE. The code looks the way it does because of them:
 //
 // 1. QUOTA BURN. v1 spent a getItem call on EVERY closed auction. 91.7% had
 //    ended with zero bids - they did not sell - and every one already showed
@@ -23,9 +23,10 @@
 //    qualifying anything, so every closure needed a paid call - which needed
 //    more budget. Self-reinforcing collapse (observed 2026-09-10 05:10-05:45,
 //    eight runs at resolvedFree:0 / deferred:505).
-//    Fix: reserve_ebay_budget takes a purpose. Settle is capped at 3000 of the
-//    4200 pool; the remaining 1200 is reachable only by snapshot, which needs
-//    ~864/day. Snapshot can no longer be starved by settle.
+//    Fix: reserve_ebay_budget takes a purpose. Settle is capped at 3,800 of the
+//    5,000 pool (was 3,000 of 4,200); the rest is reachable only by demand
+//    (<= 4,400), snapshot (<= 4,950, needs ~864/day) and customers' scans
+//    (<= 4,950). Settle can no longer starve the others.
 //
 // 4. PAID QUEUE BLOCKED THE FREE PATH. settle() reads the oldest unsettled
 //    rows, capped at 1,000 by PostgREST. Once the settle budget is spent that
@@ -35,13 +36,23 @@
 //    Fix: ebay_settle_free_auctions() settles every free-qualifying closure
 //    set-based in SQL first, so the window only ever holds paid work.
 //
+// 5. SEEDS WEREN'T WHAT PEOPLE SCAN. Six broad seeds filled the corpus with LEGO, coins and
+//    trading cards while customers scanned bags, sneakers and appliances. eBay's only sold-data API
+//    (Marketplace Insights) is closed to new applicants, so coverage has to come from here.
+//    Fix: {action:"demand"} harvests auctions for what customers actually scan (ispy_demand_queries,
+//    fed by ebay-proxy) plus a starter list, and settle() resolves those first (priority).
+//    Only auctions that already have a bid are watched from demand: they almost always sell, so each
+//    paid getItem buys a real sold price instead of confirming another no-sale.
+//
 // The lesson encoded here: verify the endpoint you actually ship, and never let
 // the expensive path outbid the cheap path that keeps it cheap.
 //
 //   {action:"snapshot"} refresh watchlist + bid state
+//   {action:"demand"}   harvest auctions for scanned/starter queries (with bids only)
 //   {action:"settle"}   resolve closed auctions
 //   {action:"stats"}    corpus state + API spend + settle backlog
 //   {action:"quota"}    eBay's own view of both pools
+//   {action:"access"}   which eBay API scopes this keyset holds (Marketplace Insights etc.)
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -65,6 +76,14 @@ const FRESH_WINDOW_MIN = 10;
 const SETTLE_ITEM_CALLS_MAX = 150;
 const SETTLE_SCAN_MAX = 1500;
 const MAX_ATTEMPTS = 4;
+const DEMAND_QUERIES_PER_RUN = 8;
+const DEMAND_SEARCH_LIMIT = 100;
+const DEMAND_WATCH_PER_QUERY = 25;
+// eBay condition IDs, matching ebay-proxy: "used" is every pre-owned grade except "for parts".
+const CONDITION_FILTERS: Record<string, string> = {
+  new: "conditionIds:{1000|1500}",
+  used: "conditionIds:{2750|3000|4000|5000|6000}",
+};
 
 let tok: { t: string; exp: number } | null = null;
 
@@ -82,6 +101,53 @@ async function ebayToken(): Promise<string> {
   const j = await r.json();
   tok = { t: j.access_token, exp: Date.now() + (j.expires_in ?? 7200) * 1000 };
   return tok.t;
+}
+
+// {action:"access"} reports which eBay API scopes this keyset has been granted, without spending
+// Browse budget. If Marketplace Insights (eBay's official sold-data API) is granted, it also runs one
+// sold search to prove it works. Never returns tokens or credentials.
+const PROBE_SCOPES: Record<string, string> = {
+  browse: "https://api.ebay.com/oauth/api_scope",
+  marketplaceInsights: "https://api.ebay.com/oauth/api_scope/buy.marketplace.insights",
+  itemFeed: "https://api.ebay.com/oauth/api_scope/buy.item.feed",
+  itemBulk: "https://api.ebay.com/oauth/api_scope/buy.item.bulk",
+  productCatalog: "https://api.ebay.com/oauth/api_scope/buy.product.feed",
+};
+
+async function access() {
+  const id = (Deno.env.get("EBAY_CLIENT_ID") ?? "").trim();
+  const sec = ((Deno.env.get("EBAY_CERT_ID") ?? Deno.env.get("EBAY_CLIENT_SECRET")) ?? "").trim();
+  if (!id || !sec) return { action: "access", error: "eBay credentials missing" };
+  const scopes: Record<string, { granted: boolean; detail?: string }> = {};
+  let insightsToken: string | null = null;
+  for (const [name, scope] of Object.entries(PROBE_SCOPES)) {
+    const r = await fetch("https://api.ebay.com/identity/v1/oauth2/token", {
+      method: "POST",
+      headers: { Authorization: `Basic ${btoa(`${id}:${sec}`)}`, "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ grant_type: "client_credentials", scope }),
+    });
+    const txt = await r.text();
+    if (r.ok) {
+      scopes[name] = { granted: true };
+      if (name === "marketplaceInsights") insightsToken = JSON.parse(txt).access_token;
+    } else {
+      let detail = txt.slice(0, 160);
+      try { const e = JSON.parse(txt); detail = `${e.error ?? ""}: ${e.error_description ?? ""}`; } catch { /* keep text */ }
+      scopes[name] = { granted: false, detail };
+    }
+  }
+  let insightsTest: unknown = null;
+  if (insightsToken) {
+    const r = await fetch(
+      "https://api.ebay.com/buy/marketplace_insights/v1_beta/item_sales/search?q=LEGO%2075192&limit=3",
+      { headers: { Authorization: `Bearer ${insightsToken}`, "X-EBAY-C-MARKETPLACE-ID": MARKET } },
+    );
+    const txt = await r.text();
+    let total: unknown = null;
+    try { total = JSON.parse(txt).total ?? null; } catch { /* not json */ }
+    insightsTest = { status: r.status, total, sample: r.ok ? null : txt.slice(0, 200) };
+  }
+  return { action: "access", clientIdPrefix: id.slice(0, 12), scopes, insightsTest };
 }
 
 function db() {
@@ -160,6 +226,62 @@ async function snapshot() {
   return { action: "snapshot", marketplace: MARKET, rowsUpserted: total, perSeed, budget, rateLimited };
 }
 
+async function demand() {
+  const sb = db();
+  const { data: queue, error } = await sb.rpc("ispy_next_demand_queries", { p_limit: DEMAND_QUERIES_PER_RUN });
+  if (error) throw new Error(`demand queue: ${error.message}`);
+  if (!queue?.length) return { action: "demand", queries: 0 };
+
+  const budget = await reserve(sb, queue.length, 0, "demand");
+  if (!budget.allowed) return { action: "demand", skipped: "demand budget exhausted", budget };
+
+  const t = await ebayToken();
+  const perQuery: Record<string, number | string> = {};
+  let watched = 0, rateLimited = false;
+
+  for (const d of queue as { query_key: string; query: string; condition: string | null; requests: number }[]) {
+    const url = new URL("https://api.ebay.com/buy/browse/v1/item_summary/search");
+    url.searchParams.set("q", d.query);
+    url.searchParams.set("limit", String(DEMAND_SEARCH_LIMIT));
+    const filters = ["buyingOptions:{AUCTION}"];
+    if (d.condition && CONDITION_FILTERS[d.condition]) filters.push(CONDITION_FILTERS[d.condition]);
+    url.searchParams.set("filter", filters.join(","));
+    url.searchParams.set("sort", "endingSoonest");
+
+    const r = await fetch(url, { headers: { Authorization: `Bearer ${t}`, "X-EBAY-C-MARKETPLACE-ID": MARKET } });
+    if (r.status === 429) { perQuery[d.query] = "rate_limited"; rateLimited = true; break; }
+    if (!r.ok) { perQuery[d.query] = `http_${r.status}`; continue; }
+
+    const data = await r.json();
+    const items = (data.itemSummaries ?? [])
+      .filter((it: any) => it.itemId && it.itemEndDate && (it.bidCount ?? 0) >= 1)
+      .slice(0, DEMAND_WATCH_PER_QUERY)
+      .map((it: any) => ({
+        itemId: it.itemId,
+        title: it.title ?? "(untitled)",
+        condition: it.condition ?? null,
+        imageUrl: it.image?.imageUrl ?? null,
+        url: it.itemWebUrl ?? null,
+        endsAt: it.itemEndDate,
+        bid: it.currentBidPrice?.value ?? null,
+        bidCount: it.bidCount ?? 0,
+      }));
+
+    const { data: res, error: watchErr } = await sb.rpc("ispy_watch_demand", {
+      p_query: d.query, p_condition: d.condition, p_record_demand: false, p_items: items,
+      p_priority: d.requests > 0 ? 2 : 1,
+    });
+    if (watchErr) { perQuery[d.query] = "db_error"; continue; }
+    await sb.rpc("ispy_mark_demand_harvested", { p_query_key: d.query_key, p_found: items.length });
+    const n = Number((res as { watched?: number } | null)?.watched ?? 0);
+    perQuery[d.query] = n;
+    watched += n;
+  }
+
+  if (rateLimited) await markThrottled(sb);
+  return { action: "demand", queries: queue.length, watched, perQuery, budget, rateLimited };
+}
+
 async function settle() {
   const sb = db();
 
@@ -179,6 +301,8 @@ async function settle() {
     .eq("settled", false)
     .lt("ends_at", new Date().toISOString())
     .lt("settle_attempts", MAX_ATTEMPTS)
+    // Customer demand (2), then starter demand (1), then broad seeds (0); oldest first within each.
+    .order("priority", { ascending: false })
     .order("ends_at", { ascending: true })
     .limit(SETTLE_SCAN_MAX);
   if (error) throw new Error(`watchlist read: ${error.message}`);
@@ -340,6 +464,8 @@ async function stats() {
     unverified: await q("ebay_sold_comps", (b) => b.eq("confidence", "unverified")),
     estimated: await q("ebay_sold_comps", (b) => b.eq("confidence", "estimated")),
     unsoldAuctions: await q("ebay_unsold_auctions"),
+    demandQueries: await q("ispy_demand_queries"),
+    demandWatching: await q("ebay_auction_watch", (b) => b.eq("settled", false).gt("priority", 0)),
     quotaDay: day,
     apiBudget: budget ?? null,
   };
@@ -353,9 +479,11 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const action = typeof body?.action === "string" ? body.action : "";
     if (action === "snapshot") return j(await snapshot());
+    if (action === "demand") return j(await demand());
     if (action === "settle") return j(await settle());
     if (action === "stats") return j(await stats());
     if (action === "quota") return j(await quota());
+    if (action === "access") return j(await access());
     return j({ error: `Unknown action: ${action || "(none)"}` }, 400);
   } catch (e) {
     return j({ error: e instanceof Error ? e.message : String(e) }, 500);

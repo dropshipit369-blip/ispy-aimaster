@@ -65,4 +65,6 @@ export interface ScanResponse {
   allowance: ScanAllowance | null
   /** Sold prices for the same item, or null when there are too few matching sales to be useful. */
   sold: SoldSummary | null
+  /** True when iSpy has started collecting eBay AU sold prices for this item because it had too few. */
+  soldTracking: boolean
 }

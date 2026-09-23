@@ -33,6 +33,9 @@ import { normaliseGtin } from "./gtin.ts";
  *      The response also carries `sold`: real eBay AU sold prices for the same item from iSpy's own
  *      sold-comps store (ispy_sold_comps_for_scan), honouring the condition filter. It costs no eBay
  *      call and no extra scan, and a failure there never fails the search (sold is then null).
+ *      When there are too few sales, the query is recorded as demand (search words only, never who
+ *      scanned) and any live AU auctions with bids in the results are watched, so harvest-auctions
+ *      collects real sold prices for it from eBay. `soldTracking: true` says that happened.
  *  - { action: "health" }
  *      → token grant check, returns environment + expiry (does not consume a scan)
  */
@@ -147,7 +150,8 @@ async function browseSearch(params: {
   }
 
   const data = await resp.json();
-  const items = (data.itemSummaries ?? []).map((it: Record<string, unknown>) => {
+  const summaries = (data.itemSummaries ?? []) as Record<string, unknown>[];
+  const items = summaries.map((it) => {
     const price = (it.price ?? {}) as Record<string, unknown>;
     const image = (it.image ?? {}) as Record<string, unknown>;
     return {
@@ -162,7 +166,70 @@ async function browseSearch(params: {
     };
   });
 
-  return { total: data.total ?? items.length, items };
+  // Live auctions that already have a bid: they almost always sell, so watching them costs one getItem
+  // per real sold price. Kept server-side for ispy_watch_demand; the client never receives this list.
+  const auctions = summaries
+    .filter((it) =>
+      Array.isArray(it.buyingOptions) && (it.buyingOptions as unknown[]).includes("AUCTION") &&
+      typeof it.itemEndDate === "string" && Number(it.bidCount ?? 0) >= 1
+    )
+    .map((it) => {
+      const bid = (it.currentBidPrice ?? {}) as Record<string, unknown>;
+      const image = (it.image ?? {}) as Record<string, unknown>;
+      return {
+        itemId: it.itemId,
+        title: it.title,
+        condition: it.condition ?? null,
+        imageUrl: image.imageUrl ?? null,
+        url: it.itemWebUrl ?? null,
+        endsAt: it.itemEndDate,
+        bid: bid.value ?? null,
+        bidCount: Number(it.bidCount ?? 0),
+      };
+    });
+
+  return { total: data.total ?? items.length, items, auctions };
+}
+
+const TRACK_TIMEOUT_MS = 1_500;
+
+/**
+ * Feeds the sold-price harvester from a customer's scan. Records the query as demand when iSpy has too
+ * few sales for it, and watches any AU auctions with bids from the results. Returns true only when the
+ * demand was actually recorded. Best effort: never fails or slows the scan beyond TRACK_TIMEOUT_MS.
+ */
+async function trackForSoldPrices(
+  db: ReturnType<typeof adminClient>,
+  query: string,
+  condition: string | undefined,
+  recordDemand: boolean,
+  auctions: unknown[],
+): Promise<boolean> {
+  if (!recordDemand && auctions.length === 0) return false;
+  const call = db.rpc("ispy_watch_demand", {
+    p_query: query.slice(0, 200),
+    p_condition: condition ?? null,
+    p_record_demand: recordDemand,
+    p_items: auctions,
+    p_priority: 2,
+  }).then(({ data, error }) => {
+    if (error) {
+      console.error(JSON.stringify({ event: "sold_tracking_failed", code: error.code }));
+      return false;
+    }
+    return (data as { recorded?: boolean } | null)?.recorded === true;
+  });
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<boolean>((resolve) => {
+    timer = setTimeout(() => resolve(false), TRACK_TIMEOUT_MS);
+  });
+  try {
+    return await Promise.race([call, timeout]);
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 const SOLD_LOOKUP_TIMEOUT_MS = 2_500;
@@ -273,7 +340,14 @@ Deno.serve(secureHandler("ebay-proxy", async (req: Request) => {
         condition,
       });
       const sold = await soldForQuery;
-      return json({ ...result, sold, quota: publicQuota(allowance) });
+      const { auctions, ...publicResult } = result;
+      // Only AU keyword scans feed the AU sold-price store. "insufficient_query" (one word) is a
+      // category, not an item, so it is never recorded as demand.
+      const isAu = !marketplaceId || marketplaceId === "EBAY_AU";
+      const soldTracking = q && isAu
+        ? await trackForSoldPrices(db, q, condition, (sold as { status?: string } | null)?.status === "insufficient_data", auctions)
+        : false;
+      return json({ ...publicResult, sold, soldTracking, quota: publicQuota(allowance) });
     } catch (error) {
       // The user should not lose a scan because eBay or our token grant failed.
       const { error: refundError } = await db.rpc("ispy_refund_market_scan", { p_user_id: user.id, p_usage_day: allowance.usage_day });
